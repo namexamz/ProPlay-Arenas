@@ -46,7 +46,7 @@ func (r *userRepository) GetByEmail(email string) (*models.User, error) {
 	return &user, nil
 }
 func (r *userRepository) Delete(id uint) error {
-	if err := r.db.Delete(id).Error; err != nil {
+	if err := r.db.Delete(models.User{},id).Error; err != nil {
 		return err
 	}
 	return nil
