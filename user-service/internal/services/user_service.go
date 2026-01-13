@@ -2,13 +2,13 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"user-service/internal/dto"
 	"user-service/internal/models"
 	"user-service/internal/repository"
 
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 )
 
 type UserService interface {
@@ -21,18 +21,17 @@ type UserService interface {
 
 type userService struct {
 	logger     *slog.Logger
-	db         *gorm.DB
 	repository repository.UserRepository
 }
 
-func NewUserService(logger *slog.Logger, db *gorm.DB, repository repository.UserRepository) UserService {
-	return &userService{logger: logger, db: db, repository: repository}
+func NewUserService(logger *slog.Logger, repository repository.UserRepository) UserService {
+	return &userService{logger: logger, repository: repository}
 }
 
 func (s *userService) Create(req dto.CreateUserRequest) (*models.User, error) {
-	PasswordHash, err := hashPassword(req.Password)
+	passwordHash, err := hashPassword(req.Password)
 	if err != nil {
-		return nil, errors.New("Оибка при хеширование пароля")
+		return nil, fmt.Errorf("ошибка при хешировании пароля: %w", err)
 	}
 
 	role := models.RoleClient
@@ -43,12 +42,12 @@ func (s *userService) Create(req dto.CreateUserRequest) (*models.User, error) {
 	user := &models.User{
 		FullName: req.FullName,
 		Email:    req.Email,
-		Password: PasswordHash,
+		Password: passwordHash,
 		Role:     role,
 	}
 
 	if err := s.repository.Create(user); err != nil {
-		return nil, errors.New("Ошибка при создании пользавателя")
+		return nil ,fmt.Errorf("ошибка при создании пользователя: %w", err)
 	}
 	return user, nil
 }
@@ -61,7 +60,7 @@ func hashPassword(password string) (string, error) {
 func (s *userService) GetByID(id uint) (*models.User, error) {
 	user, err := s.repository.GetByID(id)
 	if err != nil {
-		return nil, errors.New("Ошибка при добавление пользавателя по ID",)
+		return nil, errors.New("Ошибка при получении пользавателя по ID")
 	}
 	return user, err
 }
@@ -69,7 +68,7 @@ func (s *userService) GetByID(id uint) (*models.User, error) {
 func (s *userService) GetByEmail(email string) (*models.User, error) {
 	user, err := s.repository.GetByEmail(email)
 	if err != nil {
-		return nil, errors.New("Ошибка при создании пользавателя по Email")
+		return nil, errors.New("Ошибка при получении пользавателя по Email")
 	}
 	return user, err
 }
@@ -90,7 +89,7 @@ func (s *userService) Update(id uint, dto *dto.UpdateUserRequest) (*models.User,
 	if err := s.repository.Update(user); err != nil {
 		return nil, err
 	}
-	return user, err
+	return user,nil
 }
 
 func (s *userService) Delete(id uint) error {
