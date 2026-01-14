@@ -4,13 +4,13 @@ import (
 	"time"
 )
 
-type status string
+type Status string
 
 const (
-	pending   status = "pending"
-	confirmed status = "confirmed"
-	cancelled status = "cancelled"
-	completed status = "completed"
+	pending   Status = "pending"
+	confirmed Status = "confirmed"
+	cancelled Status = "cancelled"
+	completed Status = "completed"
 )
 
 type ReservationDetails struct {
@@ -22,11 +22,11 @@ type ReservationDetails struct {
 	Price       float64   `json:"price_cents,omitempty"`
 	Paid        bool      `json:"paid"`
 	IsAvailable bool      `json:"is_available"`
-	Status      status    `json:"status"`
+	Status      Status    `json:"status"`
 }
 
 type Reservation struct {
-	ClientID uint   `json:"client_id"`
 	StartAt  time.Time  `json:"start_at"`
 	EndAt    time.Time  `json:"end_at"`
+	Status      Status    `json:"status"`
 }
