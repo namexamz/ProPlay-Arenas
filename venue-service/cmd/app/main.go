@@ -8,9 +8,14 @@ import (
 	"venue-service/internal/config"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("Ошибка загрузки переменных окружения: ", err)
+	}
+
 	db, err := config.ConnectDB()
 	if err != nil {
 		log.Fatalf("ConnectDB: %v", err)
@@ -31,6 +36,6 @@ func main() {
 	})
 
 	if err := r.Run(fmt.Sprintf(":%s", config.GetEnv("PORT", "8080"))); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		log.Fatalf("Ошибка запуска сервера: %v", err)
 	}
 }
