@@ -13,3 +13,7 @@ type ReservationCreate struct {
 	Price    float64       `json:"price_cents,omitempty"`
 	Status   models.Status `json:"status"`
 }
+
+type ReservationCancel struct {
+	Reason string `json:"reason" binding:"required"`
+}

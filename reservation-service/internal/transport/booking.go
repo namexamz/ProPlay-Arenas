@@ -3,6 +3,7 @@ package transport
 import (
 	"reservation/internal/dto"
 	"reservation/internal/service"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -34,4 +35,27 @@ func (r *BookingHandler) CreateReservation(c *gin.Context) {
 	}
 
 	c.JSON(201, reservation)
+}
+
+func (r *BookingHandler) CancelReservation(c *gin.Context) {
+	var dto dto.ReservationCancel
+	if err := c.ShouldBindJSON(&dto); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	idParam := c.Param("id")
+	id, err := strconv.Atoi(idParam)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid reservation ID"})
+		return
+	}
+
+	reservation, err := r.bookingService.ReservationCancel(uint(id), dto.Reason)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, reservation)
 }
