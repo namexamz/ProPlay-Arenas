@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-
 	"user-service/internal/dto"
+	"user-service/internal/models"
 	service "user-service/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -23,146 +23,86 @@ func NewUserHandler(service service.UserService, logger *slog.Logger) *UserHandl
 	}
 }
 
-func (h *UserHandler) RegisterRoutes(r *gin.Engine) {
-	users := r.Group("/users")
+func (h *UserHandler) RegisterRoutes(rg *gin.RouterGroup) {
+	users := rg.Group("/users")
 	{
-		users.POST("", h.Create)
-		users.GET("/email", h.GetByEmail)
-		users.GET("/:id", h.GetByID)
-		users.PATCH("/:id", h.Update)
-		users.DELETE("/:id", h.Delete)
+		users.GET("/me", h.GetMe)
+		users.PUT("/me", h.UpdateMe)
+		users.POST("/me/become-owner", h.BecomeOwner)
+		users.GET(":id", h.GetPublicProfile)
 	}
 }
 
-func (h *UserHandler) Create(c *gin.Context) {
-	var req dto.CreateUserRequest
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
+func (h *UserHandler) GetMe(c *gin.Context) {
+	claims, exists := c.Get("claims")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
-	user, err := h.service.Create(req)
+	userClaims := claims.(*models.Claims)
+	user, err := h.service.GetMe(userClaims.UserID)
 	if err != nil {
-
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusCreated, user)
-}
-
-func (h *UserHandler) GetByID(c *gin.Context) {
-	idStr := c.Param("id")
-
-	id, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid id",
-		})
-		return
-	}
-
-	if id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "id must be greater than zero",
-		})
-		return
-	}
-
-	user, err := h.service.GetByID(uint(id))
-	if err != nil {
-
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": err.Error(),
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, user)
 }
 
-func (h *UserHandler) GetByEmail(c *gin.Context) {
-	email := c.Query("email")
-
-	if email == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "email is required",
-		})
+func (h *UserHandler) UpdateMe(c *gin.Context) {
+	claims, exists := c.Get("claims")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
-	user, err := h.service.GetByEmail(email)
-	if err != nil {
-
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, user)
-}
-
-func (h *UserHandler) Update(c *gin.Context) {
-	idStr := c.Param("id")
-
-	id, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid id",
-		})
-		return
-	}
-
-	if id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "id must be greater than zero",
-		})
-		return
-	}
-
+	userClaims := claims.(*models.Claims)
 	var req dto.UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	user, err := h.service.Update(uint(id), &req)
+	user, err := h.service.UpdateMe(userClaims.UserID, req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, user)
 }
 
-func (h *UserHandler) Delete(c *gin.Context) {
-	idStr := c.Param("id")
+func (h *UserHandler) BecomeOwner(c *gin.Context) {
+	claims, exists := c.Get("claims")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
 
-	id, err := strconv.ParseUint(idStr, 10, 64)
+	userClaims := claims.(*models.Claims)
+	user, err := h.service.BecomeOwner(userClaims.UserID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "invalid id",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := h.service.Delete(uint(id)); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
+	c.JSON(http.StatusOK, user)
+}
+
+func (h *UserHandler) GetPublicProfile(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"message": "user deleted successfully",
-	})
+
+	user, err := h.service.GetPublicProfile(uint(id))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, user)
 }

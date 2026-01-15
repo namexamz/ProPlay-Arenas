@@ -2,6 +2,8 @@ package models
 
 import "github.com/golang-jwt/jwt/v4"
 
+
+
 type RegisterRequest struct {
 	FullName string `json:"full_name" binding:"required"`
 	Email    string `json:"email" binding:"required,email"`
@@ -17,6 +19,6 @@ type AuthResponse struct {
 }
 type Claims struct {
 	UserID uint   `json:"user_id"`
-	Role   string `json:"role"`
+	Role   Role `json:"role"`
 	jwt.RegisteredClaims
 }
