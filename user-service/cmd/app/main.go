@@ -40,7 +40,7 @@ func main() {
 	userService := service.NewUserService(logger, userRepo)
 
 	// Инициализация обработчиков
-	authHandler := transport.NewAuthHandler(authService, userRepo)
+	authHandler := transport.NewAuthHandler(authService)
 	userHandler := transport.NewUserHandler(userService, logger)
 
 	// Настройка маршрутизатора

@@ -1,8 +1,8 @@
 package models
 
-import "github.com/golang-jwt/jwt/v4"
-
-
+import (
+	"github.com/golang-jwt/jwt/v4"
+)
 
 type RegisterRequest struct {
 	FullName string `json:"full_name" binding:"required"`
@@ -18,7 +18,7 @@ type AuthResponse struct {
 	AccessToken string `json:"access_token"`
 }
 type Claims struct {
-	UserID uint   `json:"user_id"`
+	UserID uint `json:"user_id"`
 	Role   Role `json:"role"`
 	jwt.RegisteredClaims
 }

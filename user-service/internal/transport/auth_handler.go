@@ -3,7 +3,6 @@ package transport
 import (
 	"net/http"
 	"user-service/internal/models"
-	"user-service/internal/repository"
 	service "user-service/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -11,13 +10,11 @@ import (
 
 type AuthHandler struct {
 	authService *service.AuthService
-	userRepo    repository.UserRepository
 }
 
-func NewAuthHandler(authService *service.AuthService, userRepo repository.UserRepository) *AuthHandler {
+func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
-		userRepo:    userRepo,
 	}
 }
 

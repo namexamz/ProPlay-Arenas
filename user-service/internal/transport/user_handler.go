@@ -107,8 +107,8 @@ func (h *UserHandler) BecomeOwner(c *gin.Context) {
 
 func (h *UserHandler) GetPublicProfile(c *gin.Context) {
 	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
+	id, err := strconv.Atoi(idParam)
+	if err != nil || id < 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
 		return
 	}
