@@ -15,5 +15,5 @@ type ReservationCreate struct {
 }
 
 type ReservationCancel struct {
-	Reason string `json:"reason"`
+	Reason string `json:"reason" binding:"required"`
 }

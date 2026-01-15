@@ -9,7 +9,6 @@ import (
 )
 
 type BookingService interface {
-	
 	GetUserReservations(userID uint) ([]models.Reservation, error)
 	CreateReservation(reservation *dto.ReservationCreate) (*models.ReservationDetails, error)
 	ReservationCancel(id uint, reason string) (*models.ReservationDetails, error)
@@ -98,6 +97,10 @@ func (r *bookingService) ReservationCancel(id uint, reason string) (*models.Rese
 	reservation, err := r.repo.GetByID(id)
 	if err != nil {
 		return nil, err
+	}
+
+	if reservation.Status == models.Cancelled || reservation.Status == models.Completed {
+		return nil, errors.New("cannot cancel reservation")
 	}
 
 	reservation.Status = models.Cancelled
