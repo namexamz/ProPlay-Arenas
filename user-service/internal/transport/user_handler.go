@@ -47,7 +47,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 	user, err := h.service.Create(req)
 	if err != nil {
 
-		c.JSON(http.StatusBadRequest, gin.H{
+		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
 		})
 		return
@@ -59,9 +59,8 @@ func (h *UserHandler) Create(c *gin.Context) {
 func (h *UserHandler) GetByID(c *gin.Context) {
 	idStr := c.Param("id")
 
-	id, err := strconv.Atoi(idStr)
+	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
-
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "invalid id",
 		})
@@ -112,7 +111,7 @@ func (h *UserHandler) GetByEmail(c *gin.Context) {
 func (h *UserHandler) Update(c *gin.Context) {
 	idStr := c.Param("id")
 
-	id, err := strconv.Atoi(idStr)
+	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "invalid id",
@@ -151,7 +150,7 @@ func (h *UserHandler) Delete(c *gin.Context) {
 
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
+		c.JSON(http.StatusNotFound, gin.H{
 			"error": "invalid id",
 		})
 		return
