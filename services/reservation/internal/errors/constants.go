@@ -1,7 +1,5 @@
-package dto
-
-import "errors"
+package errors
 
 var (
-	ErrListFound = errors.New("error get list bokings")
+	
 )

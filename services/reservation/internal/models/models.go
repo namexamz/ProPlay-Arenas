@@ -7,10 +7,10 @@ import (
 type Status string
 
 const (
-	pending   Status = "pending"
-	confirmed Status = "confirmed"
-	cancelled Status = "cancelled"
-	completed Status = "completed"
+	Pending   Status = "pending"
+	Confirmed Status = "confirmed"
+	Cancelled Status = "cancelled"
+	Completed Status = "completed"
 )
 
 type ReservationDetails struct {
