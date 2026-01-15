@@ -8,17 +8,16 @@ import (
 	"time"
 )
 
-	type BookingService interface {
-		
+type BookingService interface {
 	GetUserReservations(userID uint) ([]models.Reservation, error)
 	CreateReservation(reservation *dto.ReservationCreate) (*models.ReservationDetails, error)
-	}
-
-type bookingService struct {
-	repo repository.BokingRepo
 }
 
-func NewBookingServ(repo repository.BokingRepo) BookingService {
+type bookingService struct {
+	repo repository.BookingRepo
+}
+
+func NewBookingServ(repo repository.BookingRepo) BookingService {
 	return &bookingService{repo: repo}
 }
 
