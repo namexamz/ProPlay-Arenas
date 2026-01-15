@@ -15,5 +15,5 @@ type User struct {
 	FullName string `json:"full_name"`
 	Email    string `json:"email" gorm:"uniqueIndex;not null"`
 	Password string `json:"-"`
-	Role     Role   `json:"role" gorm:"type:varchar(20);default:'client'"`
+	Role     Role   `json:"role" gorm:"type:varchar(20);default:'Client'"`
 }

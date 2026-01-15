@@ -13,6 +13,7 @@ type UserRepository interface {
 	GetByEmail(email string) (*models.User, error)
 	Delete(id uint) error
 	Update(user *models.User) error
+	UpdateRole(userID uint, role models.Role) error
 }
 type userRepository struct {
 	logger *slog.Logger
@@ -24,7 +25,7 @@ func NewUserRepository(logger *slog.Logger, db *gorm.DB) UserRepository {
 }
 
 func (r *userRepository) Create(user *models.User) error {
-	if err := r.db.Create(&user).Error; err != nil {
+	if err := r.db.Create(user).Error; err != nil {
 		return err
 	}
 	return nil
@@ -46,7 +47,7 @@ func (r *userRepository) GetByEmail(email string) (*models.User, error) {
 	return &user, nil
 }
 func (r *userRepository) Delete(id uint) error {
-	if err := r.db.Delete(models.User{},id).Error; err != nil {
+	if err := r.db.Delete(models.User{}, id).Error; err != nil {
 		return err
 	}
 	return nil
@@ -56,4 +57,7 @@ func (r *userRepository) Update(user *models.User) error {
 		return err
 	}
 	return nil
+}
+func (r *userRepository) UpdateRole(id uint, role models.Role) error {
+	return r.db.Model(models.User{}).Where("id = ?", id).Update("role", role).Error
 }
