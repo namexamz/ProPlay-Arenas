@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type BokingRepo interface {
+type BookingRepo interface {
 	List() ([]models.Reservation, error)
 	GetUserReservations(userID uint) ([]models.Reservation, error)
 	GetReservationDetails(id uint) (*models.ReservationDetails, error)
