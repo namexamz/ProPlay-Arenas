@@ -2,6 +2,7 @@ package transport
 
 import (
 	"reservation/internal/dto"
+	
 	"reservation/internal/service"
 	"strconv"
 
@@ -18,6 +19,7 @@ func NewBookingHandler(bookingService service.BookingService) *BookingHandler {
 
 func (r *BookingHandler) Register(c *gin.Engine) {
 	c.POST("/booking", r.CreateReservation)
+	c.POST("/bookings/:id/cancel", r.CancelReservation)
 }
 
 func (r *BookingHandler) CreateReservation(c *gin.Context) {
@@ -58,4 +60,28 @@ func (r *BookingHandler) CancelReservation(c *gin.Context) {
 	}
 
 	c.JSON(200, reservation)
+}
+
+func (r *BookingHandler) GetByID(c *gin.Context){
+	idstr := c.Param("id")
+
+	id, err := strconv.Atoi(idstr)
+
+	if err != nil {
+		c.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	reservation, error :=  r.bookingService.GetByID(uint(id))
+	if error != nil {
+		c.JSON(404, gin.H{
+			"error":err.Error(),
+		})
+		return
+	}
+
+	c.JSON(200, reservation)
+	
 }
