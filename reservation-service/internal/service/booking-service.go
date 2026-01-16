@@ -12,6 +12,7 @@ type BookingService interface {
 	GetUserReservations(userID uint) ([]models.Reservation, error)
 	CreateReservation(reservation *dto.ReservationCreate) (*models.ReservationDetails, error)
 	ReservationCancel(id uint, reason string) (*models.ReservationDetails, error)
+	GetByID(id uint) (*models.ReservationDetails, error)
 }
 
 type bookingService struct {
@@ -23,14 +24,15 @@ func NewBookingServ(repo repository.BookingRepo) BookingService {
 }
 
 var (
-	ErrClientID          = errors.New("client ID must be greater than zero")
-	ErrOwnerID           = errors.New("owner ID must be greater than zero")
-	ErrStartAtEmpty      = errors.New("start time must be provided")
-	ErrEndAtEmpty        = errors.New("end time must be provided")
-	ErrStartAtAfterEndAt = errors.New("start time must be before end time")
-	ErrStartAtInPast     = errors.New("start time cannot be in the past")
-	ErrNegativePrice     = errors.New("price cannot be negative and not be zero")
-	ErrStatusEmpty       = errors.New("status must be provided")
+	ErrClientID            = errors.New("client ID must be greater than zero")
+	ErrOwnerID             = errors.New("owner ID must be greater than zero")
+	ErrStartAtEmpty        = errors.New("start time must be provided")
+	ErrEndAtEmpty          = errors.New("end time must be provided")
+	ErrStartAtAfterEndAt   = errors.New("start time must be before end time")
+	ErrStartAtInPast       = errors.New("start time cannot be in the past")
+	ErrNegativePrice       = errors.New("price cannot be negative and not be zero")
+	ErrStatusEmpty         = errors.New("status must be provided")
+	ErrReservationNotFound = errors.New("reservation not found")
 )
 
 func (r *bookingService) GetUserReservations(userID uint) ([]models.Reservation, error) {
@@ -41,6 +43,16 @@ func (r *bookingService) GetUserReservations(userID uint) ([]models.Reservation,
 	}
 
 	return reservations, nil
+}
+
+func (r *bookingService) GetByID(id uint) (*models.ReservationDetails, error) {
+	reservation, err := r.repo.GetByID(id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return reservation, nil
 }
 
 func (r *bookingService) CreateReservation(reservation *dto.ReservationCreate) (*models.ReservationDetails, error) {

@@ -38,7 +38,7 @@ func (r *gormBookingRepo) GetUserReservations(userID uint) ([]models.Reservation
 		Select("start_at", "end_at", "status").
 		Find(&reservations)
 
-	if result.Error != nil {
+	if result.Error != nil { 
 		return nil, result.Error
 	}
 
