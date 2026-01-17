@@ -2,7 +2,7 @@ package transport
 
 import (
 	"reservation/internal/dto"
-
+	"reservation/internal/middleware"
 	"reservation/internal/service"
 	"strconv"
 
@@ -11,18 +11,18 @@ import (
 
 type BookingHandler struct {
 	bookingService service.BookingService
-	jwtSecret      string
+
 }
 
-func NewBookingHandler(bookingService service.BookingService, jwtSecret string) *BookingHandler {
-	return &BookingHandler{bookingService: bookingService, jwtSecret: jwtSecret}
+func NewBookingHandler(bookingService service.BookingService) *BookingHandler {
+	return &BookingHandler{bookingService: bookingService}
 }
 
-func (r *BookingHandler) Register(c *gin.Engine) {
+func (r *BookingHandler) Register(c *gin.Engine, jwtSecret string) {
 	c.POST("/booking",  r.CreateReservation)
 	c.POST("/bookings/:id/cancel",  r.CancelReservation)
 	c.GET("/bookings/:id", r.GetByID)
-	c.GET("/bookings", r.GetUserReservations)
+	c.GET("/bookings", middleware.AuthMiddleware(jwtSecret), r.GetUserReservations)
 }
 
 func (r *BookingHandler) CreateReservation(c *gin.Context) {
@@ -90,7 +90,7 @@ func (r *BookingHandler) GetByID(c *gin.Context) {
 }
 
 func (r *BookingHandler) GetUserReservations(c *gin.Context) {
-    // Получить user ID из контекста
+   
     userID, exists := c.Get("userID")
     if !exists {
         c.JSON(401, gin.H{"error": "unauthorized"})
@@ -98,9 +98,11 @@ func (r *BookingHandler) GetUserReservations(c *gin.Context) {
     }
     
     
-
-    // Используйте userID (uint) для создания резервации
-    clientID := userID.(uint)
+    clientID, ok := userID.(uint)
+    if !ok {
+        c.JSON(401, gin.H{"error": "invalid user ID type"})
+        return
+    }
 
     reservation, err := r.bookingService.GetUserReservations(clientID)
     if err != nil {
@@ -108,5 +110,5 @@ func (r *BookingHandler) GetUserReservations(c *gin.Context) {
         return
     }
 
-    c.JSON(201, reservation)
+    c.JSON(200, reservation)
 }
