@@ -13,10 +13,6 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("не удалось загрузить переменные окружения", err)
 	}
-
-	// Инициализация логгера
-	config.InitLogger()
-
 	// Подключение к БД
 	db := config.ConnectDB()
 
