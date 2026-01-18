@@ -3,10 +3,9 @@ package config
 import (
 	"log"
 	"os"
-	"time"
 )
 
-var Logger *log.Logger
+var Logger *log.Logger = log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile)
 
 func InitLogger() *log.Logger {
 	// Определяем выходной файл для логов
@@ -24,7 +23,7 @@ func InitLogger() *log.Logger {
 	// Создаем логгер с указанием файла и флагов
 	Logger = log.New(
 		file,
-		"["+time.Now().Format("2006-01-02 15:04:05")+"] ",
+		"",
 		log.LstdFlags|log.Lshortfile,
 	)
 
@@ -33,11 +32,17 @@ func InitLogger() *log.Logger {
 
 // Info логирует информационные сообщения
 func Info(msg string) {
+	if Logger == nil {
+		return
+	}
 	Logger.Printf("[INFO] %s", msg)
 }
 
 // Error логирует ошибки
 func Error(msg string, err error) {
+	if Logger == nil {
+		return
+	}
 	if err != nil {
 		Logger.Printf("[ERROR] %s: %v", msg, err)
 	} else {
@@ -47,11 +52,17 @@ func Error(msg string, err error) {
 
 // Warn логирует предупреждения
 func Warn(msg string) {
+	if Logger == nil {
+		return
+	}
 	Logger.Printf("[WARN] %s", msg)
 }
 
 // Debug логирует отладочные сообщения
 func Debug(msg string) {
+	if Logger == nil {
+		return
+	}
 	if os.Getenv("DEBUG") == "true" {
 		Logger.Printf("[DEBUG] %s", msg)
 	}

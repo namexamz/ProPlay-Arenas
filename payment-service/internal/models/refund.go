@@ -1,7 +1,6 @@
 package models
 
 import (
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -15,9 +14,9 @@ const (
 
 type Refund struct {
 	gorm.Model
-	PaymentID uuid.UUID    `gorm:"type:uuid;index"`
+	PaymentID uint         `gorm:"index"`
 	Amount    int64        `gorm:"column:amount"`
 	Reason    string       `gorm:"column:reason;type:text"`
 	Status    RefundStatus `gorm:"column:status"`
-	Payment   *Payment     `gorm:"foreignKey:PaymentID"`
+	Payment   *Payment     `gorm:"foreignKey:PaymentID;references:ID"`
 }
