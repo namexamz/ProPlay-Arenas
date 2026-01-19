@@ -13,6 +13,10 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("не удалось загрузить переменные окружения", err)
 	}
+
+	// Инициализация логгера
+	config.InitLogger()
+
 	// Подключение к БД
 	db := config.ConnectDB()
 
@@ -21,9 +25,9 @@ func main() {
 		&models.Payment{},
 		&models.Refund{},
 	); err != nil {
-		log.Fatalf("ошибка миграции базы данных: %v", err)
+		config.Error("ошибка миграции базы данных", err)
 	}
 
-	log.Println("✓ миграция БД успешна")
-	log.Println("✓ сервис платежей готов")
+	config.Info("✓ миграция БД успешна")
+	config.Info("✓ сервис платежей готов")
 }

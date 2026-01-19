@@ -32,17 +32,11 @@ func InitLogger() *log.Logger {
 
 // Info логирует информационные сообщения
 func Info(msg string) {
-	if Logger == nil {
-		return
-	}
 	Logger.Printf("[INFO] %s", msg)
 }
 
 // Error логирует ошибки
 func Error(msg string, err error) {
-	if Logger == nil {
-		return
-	}
 	if err != nil {
 		Logger.Printf("[ERROR] %s: %v", msg, err)
 	} else {
@@ -52,17 +46,11 @@ func Error(msg string, err error) {
 
 // Warn логирует предупреждения
 func Warn(msg string) {
-	if Logger == nil {
-		return
-	}
 	Logger.Printf("[WARN] %s", msg)
 }
 
 // Debug логирует отладочные сообщения
 func Debug(msg string) {
-	if Logger == nil {
-		return
-	}
 	if os.Getenv("DEBUG") == "true" {
 		Logger.Printf("[DEBUG] %s", msg)
 	}
