@@ -1,11 +1,16 @@
 package service
 
 import (
+	"context"
 	"errors"
+	"log"
 	"reservation/internal/dto"
+	"reservation/internal/kafka"
 	"reservation/internal/models"
 	"reservation/internal/repository"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type BookingService interface {
@@ -17,11 +22,12 @@ type BookingService interface {
 }
 
 type bookingService struct {
-	repo repository.BookingRepo
+	repo     repository.BookingRepo
+	producer kafka.Producer
 }
 
-func NewBookingServ(repo repository.BookingRepo) BookingService {
-	return &bookingService{repo: repo}
+func NewBookingServ(repo repository.BookingRepo, producer kafka.Producer) BookingService {
+	return &bookingService{repo: repo, producer: producer}
 }
 
 var (
@@ -104,6 +110,23 @@ func (r *bookingService) CreateReservation(reservation *dto.ReservationCreate) (
 		return nil, err
 	}
 
+	evt := dto.BookingCreatedEvent{
+		EventID:   uuid.NewString(),
+		CreatedAt: time.Now(),
+		BookingID: newReservation.ID,
+		VenueID:   newReservation.VenueID,
+		ClientID:  newReservation.ClientID,
+		OwnerID:   newReservation.OwnerID,
+		StartAt:   newReservation.StartAt,
+		EndAt:     newReservation.EndAt,
+		Price:     newReservation.Price,
+		Status:    newReservation.Status,
+	}
+
+	if err := r.producer.PublishBookingCreated(context.Background(), evt); err != nil {
+		log.Printf("Ошибка отправки события в Kafka: %v", err)
+	}
+
 	return newReservation, nil
 }
 
@@ -124,14 +147,59 @@ func (r *bookingService) ReservationCancel(id uint, reason string) (*models.Rese
 		return nil, err
 	}
 
+	evt := dto.BookingCancelledEvent{
+		EventID:   uuid.NewString(),
+		CreatedAt: time.Now(),
+		BookingID: reservation.ID,
+		Reason:    reason,
+		Status:    reservation.Status,
+	}
+
+	if err := r.producer.PublishBookingCancelled(context.Background(), evt); err != nil {
+		log.Printf("Ошибка отправки события отмены в Kafka: %v", err)
+	}
+
 	return reservation, nil
 }
 
-func (r *bookingService) ReservationUpdate(id uint,reservation *dto.ReservationUpdate) (*models.ReservationDetails, error) {
+func (r *bookingService) ReservationUpdate(id uint, reservation *dto.ReservationUpdate) (*models.ReservationDetails, error) {
 
 	reserv, err := r.repo.GetByID(id)
 	if err != nil {
 		return nil, err
+	}
+
+	if reservation.ClientID != nil && *reservation.ClientID <= 0 {
+		return nil, ErrClientID
+	}
+
+	if reservation.OwnerID != nil && *reservation.OwnerID <= 0 {
+		return nil, ErrOwnerID
+	}
+
+	if reservation.StartAt != nil && reservation.StartAt.IsZero() {
+		return nil, ErrStartAtEmpty
+	}
+
+	if reservation.EndAt != nil && reservation.EndAt.IsZero() {
+		return nil, ErrEndAtEmpty
+	}
+
+	if reservation.StartAt != nil && reservation.EndAt != nil {
+		if !reservation.StartAt.Before(*reservation.EndAt) {
+			return nil, ErrStartAtAfterEndAt
+		}
+	}
+
+	if reservation.StartAt != nil {
+		if reservation.StartAt.Before(time.Now()) {
+			return nil, ErrStartAtInPast
+		}
+
+	}
+
+	if reservation.Price != nil && *reservation.Price <= 0 {
+		return nil, ErrNegativePrice
 	}
 
 	if reserv.Status != models.Pending {
@@ -165,6 +233,8 @@ func (r *bookingService) ReservationUpdate(id uint,reservation *dto.ReservationU
 	if err := r.repo.Save(reserv); err != nil {
 		return nil, err
 	}
+
+	reserv.Duration = reserv.EndAt.Sub(reserv.StartAt)
 
 	return reserv, nil
 

@@ -27,3 +27,27 @@ type ReservationUpdate struct {
 	EndAt    *time.Time `json:"end_at,omitempty"`
 	Price    *float64   `json:"price_cents,omitempty"`
 }
+
+type BookingCreatedEvent struct {
+	EventID   string    `json:"event_id"`
+	CreatedAt time.Time `json:"created_at"`
+
+	BookingID uint      `json:"booking_id"`
+	VenueID   uint      `json:"venue_id"`
+	ClientID  uint      `json:"client_id"`
+	OwnerID   uint      `json:"owner_id"`
+	StartAt   time.Time `json:"start_at"`
+	EndAt     time.Time `json:"end_at"`
+
+	Price  float64       `json:"price_cents"`
+	Status models.Status `json:"status"`
+}
+
+type BookingCancelledEvent struct {
+	EventID   string    `json:"event_id"`
+	CreatedAt time.Time `json:"created_at"`
+
+	BookingID uint          `json:"booking_id"`
+	Reason    string        `json:"reason"`
+	Status    models.Status `json:"status"`
+}

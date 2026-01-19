@@ -22,6 +22,7 @@ func (r *BookingHandler) Register(c *gin.Engine, jwtSecret string) {
 	c.POST("/bookings/:id/cancel", r.CancelReservation)
 	c.GET("/bookings/:id", r.GetByID)
 	c.GET("/bookings", middleware.AuthMiddleware(jwtSecret), r.GetUserReservations)
+	c.PUT("/bookings/:id", r.UpdateReservation)
 }
 
 func (r *BookingHandler) CreateReservation(c *gin.Context) {
