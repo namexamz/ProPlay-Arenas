@@ -13,6 +13,7 @@ type BookingService interface {
 	CreateReservation(reservation *dto.ReservationCreate) (*models.ReservationDetails, error)
 	ReservationCancel(id uint, reason string) (*models.ReservationDetails, error)
 	GetByID(id uint) (*models.ReservationDetails, error)
+	ReservationUpdate(id uint, reservation *dto.ReservationUpdate) (*models.ReservationDetails, error)
 }
 
 type bookingService struct {
@@ -33,6 +34,7 @@ var (
 	ErrNegativePrice       = errors.New("price cannot be negative and not be zero")
 	ErrStatusEmpty         = errors.New("status must be provided")
 	ErrReservationNotFound = errors.New("reservation not found")
+	ErrInvalidStatus       = errors.New("invalid reservation status")
 )
 
 func (r *bookingService) GetUserReservations(userID uint) ([]models.Reservation, error) {
@@ -123,4 +125,47 @@ func (r *bookingService) ReservationCancel(id uint, reason string) (*models.Rese
 	}
 
 	return reservation, nil
+}
+
+func (r *bookingService) ReservationUpdate(id uint,reservation *dto.ReservationUpdate) (*models.ReservationDetails, error) {
+
+	reserv, err := r.repo.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	if reserv.Status != models.Pending {
+		return nil, errors.New("only pending reservations can be updated. Current status: " + string(reserv.Status))
+	}
+
+	if reservation.VenueID != nil {
+		reserv.VenueID = *reservation.VenueID
+	}
+
+	if reservation.ClientID != nil {
+		reserv.ClientID = *reservation.ClientID
+	}
+
+	if reservation.OwnerID != nil {
+		reserv.OwnerID = *reservation.OwnerID
+	}
+
+	if reservation.StartAt != nil {
+		reserv.StartAt = *reservation.StartAt
+	}
+
+	if reservation.EndAt != nil {
+		reserv.EndAt = *reservation.EndAt
+	}
+
+	if reservation.Price != nil {
+		reserv.Price = *reservation.Price
+	}
+
+	if err := r.repo.Save(reserv); err != nil {
+		return nil, err
+	}
+
+	return reserv, nil
+
 }

@@ -8,13 +8,9 @@ import (
 )
 
 type BookingRepo interface {
-	List() ([]models.Reservation, error)
 	GetByID(id uint) (*models.ReservationDetails, error)
 	GetUserReservations(userID uint) ([]models.Reservation, error)
-	GetReservationDetails(id uint) (*models.ReservationDetails, error)
 	Create(reservation *models.ReservationDetails) error
-	Update(reservation *models.ReservationDetails) error
-	Delete(id uint) error
 	Save(reservation *models.ReservationDetails) error
 }
 

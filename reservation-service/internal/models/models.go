@@ -15,6 +15,7 @@ const (
 
 type ReservationDetails struct {
 	Base
+	VenueID         uint          `json:"venue_id"`
 	ClientID        uint          `json:"client_id"`
 	OwnerID         uint          `json:"owner_id"`
 	StartAt         time.Time     `json:"start_at" gorm:"not null"`

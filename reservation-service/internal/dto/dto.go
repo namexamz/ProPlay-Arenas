@@ -6,6 +6,7 @@ import (
 )
 
 type ReservationCreate struct {
+	VenueID  uint          `json:"venue_id" binding:"required"`
 	ClientID uint          `json:"client_id"`
 	OwnerID  uint          `json:"owner_id"`
 	StartAt  time.Time     `json:"start_at"`
@@ -16,4 +17,13 @@ type ReservationCreate struct {
 
 type ReservationCancel struct {
 	Reason string `json:"reason" binding:"required"`
+}
+
+type ReservationUpdate struct {
+	VenueID  *uint      `json:"venue_id,omitempty"`
+	ClientID *uint      `json:"client_id,omitempty"`
+	OwnerID  *uint      `json:"owner_id,omitempty"`
+	StartAt  *time.Time `json:"start_at,omitempty"`
+	EndAt    *time.Time `json:"end_at,omitempty"`
+	Price    *float64   `json:"price_cents,omitempty"`
 }

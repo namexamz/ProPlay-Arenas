@@ -110,3 +110,28 @@ func (r *BookingHandler) GetUserReservations(c *gin.Context) {
 
 	c.JSON(200, reservation)
 }
+
+func (r *BookingHandler) UpdateReservation(c *gin.Context) {
+	var dto dto.ReservationUpdate
+
+	idParam := c.Param("id")
+	id, err := strconv.Atoi(idParam)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid reservation ID"})
+		return
+	}
+
+	if err := c.ShouldBindJSON(&dto); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	reservation, err := r.bookingService.ReservationUpdate(uint(id), &dto)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, reservation)
+
+}
