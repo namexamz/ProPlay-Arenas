@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"reservation/internal/config"
+	"reservation/internal/kafka"
 	"reservation/internal/models"
 	"reservation/internal/repository"
 	"reservation/internal/service"
@@ -17,7 +18,7 @@ func main() {
 	err := godotenv.Load()
 
 	if err != nil {
-		log.Fatal("Warning: .env file not found, using system environment variables", err)
+		log.Fatal(".env file not found, using system environment variables", err)
 	}
 
 	db := config.SetUpDatabaseConnection()
@@ -26,10 +27,22 @@ func main() {
 		log.Fatal("Ошибка миграции базы данных:", err)
 	}
 
-	bookingRepo := repository.NewBookingRepo(db)
-	bookingServ := service.NewBookingServ(bookingRepo)
+	kafkaBrokers := os.Getenv("KAFKA_BROKERS")
+	if kafkaBrokers == "" {
+		log.Fatal("KAFKA_BROKERS не задан в переменных окружения")
+	}
 
-	// Получение JWT секретного ключа
+	producer := kafka.NewProducer([]string{kafkaBrokers})
+	
+		if err := producer.Close(); err != nil {
+			log.Printf("Ошибка закрытия Kafka продюсера: %v", err)
+		}
+	
+
+	bookingRepo := repository.NewBookingRepo(db)
+	bookingServ := service.NewBookingServ(bookingRepo, producer)
+
+	
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		log.Fatal("JWT_SECRET не задан в переменных окружения")
@@ -39,7 +52,7 @@ func main() {
 
 	transport.RegisterRoutes(r, bookingServ, jwtSecret)
 
-	// Запуск сервера
+	
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8081"

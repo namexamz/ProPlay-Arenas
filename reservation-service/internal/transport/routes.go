@@ -11,7 +11,7 @@ func RegisterRoutes(
 	reservationServ service.BookingService,
 	jwtSecret string,
 ){
-	reservationHandler := NewBookingHandler(r, reservationServ)
+	reservationHandler := NewBookingHandler( reservationServ)
 
 	reservationHandler.Register(r, jwtSecret)
 }

@@ -15,16 +15,16 @@ type BookingHandler struct {
 	bookingService service.BookingService
 }
 
-func NewBookingHandler(c *gin.Engine, bookingService service.BookingService) *BookingHandler {
+func NewBookingHandler( bookingService service.BookingService) *BookingHandler {
 	return &BookingHandler{bookingService: bookingService}
 }
 
 func (r *BookingHandler) Register(c *gin.Engine, jwtSecret string) {
-	c.POST("/booking", r.CreateReservation)
+	c.POST("/booking", middleware.AuthMiddleware(jwtSecret), r.CreateReservation)
 	c.POST("/bookings/:id/cancel", r.CancelReservation)
 	c.GET("/bookings/:id", r.GetByID)
 	c.GET("/bookings", middleware.AuthMiddleware(jwtSecret), r.GetUserReservations)
-	c.PUT("/bookings/:id", r.UpdateReservation)
+	c.PUT("/bookings/:id", middleware.AuthMiddleware(jwtSecret), r.UpdateReservation)
 }
 
 
@@ -42,15 +42,15 @@ func (r *BookingHandler) CreateReservation(c *gin.Context) {
 		return
 	}
 
-	var dto dto.ReservationCreate
+	var req dto.ReservationCreate
 
-	if err := c.ShouldBindJSON(&dto); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
 
-	reservation, err := r.bookingService.CreateReservation(&dto, claims)
+	reservation, err := r.bookingService.CreateReservation(&req, claims)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -130,7 +130,7 @@ func (r *BookingHandler) GetUserReservations(c *gin.Context) {
 }
 
 func (r *BookingHandler) UpdateReservation(c *gin.Context) {
-	var dto dto.ReservationUpdate
+	var req dto.ReservationUpdate
 
 	idParam := c.Param("id")
 	id, err := strconv.Atoi(idParam)
@@ -139,12 +139,12 @@ func (r *BookingHandler) UpdateReservation(c *gin.Context) {
 		return
 	}
 
-	if err := c.ShouldBindJSON(&dto); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
-	reservation, err := r.bookingService.ReservationUpdate(uint(id), &dto)
+	reservation, err := r.bookingService.ReservationUpdate(uint(id), &req)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return

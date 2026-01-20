@@ -6,13 +6,13 @@ import (
 )
 
 type ReservationCreate struct {
-	VenueID  uint          `json:"venue_id" binding:"required"`
-	ClientID uint          `json:"client_id"`
-	OwnerID  uint          `json:"owner_id"`
-	StartAt  time.Time     `json:"start_at"`
-	EndAt    time.Time     `json:"end_at"`
-	Price    float64       `json:"price_cents,omitempty"`
-	Status   models.Status `json:"status"`
+	VenueID  uint          `json:"venue_id" binding:"required,min=1"`
+	ClientID uint          `json:"client_id" binding:"required,min=1"`
+	OwnerID  uint          `json:"owner_id" binding:"required,min=1"`
+	StartAt  time.Time     `json:"start_at" binding:"required"`
+	EndAt    time.Time     `json:"end_at" binding:"required"`
+	Price    float64       `json:"price_cents" binding:"required,min=0.01"`
+	Status   models.Status `json:"status" binding:"required"`
 }
 
 type ReservationCancel struct {

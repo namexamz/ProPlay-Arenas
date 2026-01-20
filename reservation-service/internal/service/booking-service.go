@@ -65,10 +65,7 @@ func (r *bookingService) GetByID(id uint) (*models.ReservationDetails, error) {
 }
 
 func (r *bookingService) CreateReservation(reservation *dto.ReservationCreate, claims *models.Claims) (*models.ReservationDetails, error) {
-	if reservation.ClientID <= 0 {
-		return nil, ErrClientID
-	}
-
+	
 	if reservation.OwnerID <= 0 {
 		return nil, ErrOwnerID
 	}

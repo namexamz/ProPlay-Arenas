@@ -2,19 +2,14 @@ package config
 
 import (
 	"fmt"
-	
+
 	"os"
 
-	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 func SetUpDatabaseConnection() *gorm.DB {
-	if err := godotenv.Load(); err != nil {
-		
-		panic(err)
-	}
 
 	dbHost := os.Getenv("DB_HOST")
 	dbPort := os.Getenv("DB_PORT")
@@ -40,6 +35,5 @@ func SetUpDatabaseConnection() *gorm.DB {
 		panic(err)
 	}
 
-	
 	return db
 }
