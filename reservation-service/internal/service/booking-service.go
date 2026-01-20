@@ -131,8 +131,9 @@ func (r *bookingService) CreateReservation(reservation *dto.ReservationCreate, c
 
 	if err := r.producer.PublishBookingCreated(context.Background(), evt); err != nil {
 		log.Printf("Ошибка отправки события в Kafka: %v", err)
-		return newReservation, fmt.Errorf("бронь создана (id=%d), но не удалось отправить событие в Kafka: %w", newReservation.ID, err)
+		return nil, fmt.Errorf("бронь создана (id=%d), но не удалось отправить событие в Kafka: %w", newReservation.ID, err)
 	}
+
 
 	return newReservation, nil
 }
