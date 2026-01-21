@@ -212,7 +212,14 @@ func (h *VenueHandler) Update(c *gin.Context) {
 
 	h.logger.Info("Площадка успешно обновлена", "id", id)
 	// Получаем обновленную площадку для ответа
-	updatedVenue, _ := h.service.GetByID(id)
+	updatedVenue, err := h.service.GetByID(id)
+	if err != nil {
+		h.logger.Error("Ошибка получения обновленной площадки", "id", id, "error", err)
+		// Обновление прошло успешно, но не удалось получить обновленную запись
+		// Возвращаем 204 No Content вместо ошибки
+		c.Status(http.StatusNoContent)
+		return
+	}
 	venueDTO := ToVenueDTO(updatedVenue)
 	c.JSON(http.StatusOK, venueDTO)
 }
@@ -310,7 +317,14 @@ func (h *VenueHandler) UpdateSchedule(c *gin.Context) {
 
 	h.logger.Info("Расписание успешно обновлено", "id", id)
 	// Возвращаем обновленное расписание
-	updatedVenue, _ := h.service.GetSchedule(id)
+	updatedVenue, err := h.service.GetSchedule(id)
+	if err != nil {
+		h.logger.Error("Ошибка получения обновленного расписания", "id", id, "error", err)
+		// Обновление прошло успешно, но не удалось получить обновленную запись
+		// Возвращаем 204 No Content вместо ошибки
+		c.Status(http.StatusNoContent)
+		return
+	}
 	scheduleDTO := ToScheduleDTO(updatedVenue)
 	c.JSON(http.StatusOK, scheduleDTO)
 }
