@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"errors"
+	"reservation/internal/errors"
 	"fmt"
 	"log"
 	"reservation/internal/dto"
@@ -31,20 +31,6 @@ func NewBookingServ(repo repository.BookingRepo, producer kafka.Producer) Bookin
 	return &bookingService{repo: repo, producer: producer}
 }
 
-var (
-	ErrClientID            = errors.New("client ID must be greater than zero")
-	ErrOwnerID             = errors.New("owner ID must be greater than zero")
-	ErrStartAtEmpty        = errors.New("start time must be provided")
-	ErrEndAtEmpty          = errors.New("end time must be provided")
-	ErrStartAtAfterEndAt   = errors.New("start time must be before end time")
-	ErrStartAtInPast       = errors.New("start time cannot be in the past")
-	ErrNegativePrice       = errors.New("price cannot be negative and not be zero")
-	ErrStatusEmpty         = errors.New("status must be provided")
-	ErrReservationNotFound = errors.New("reservation not found")
-	ErrInvalidStatus       = errors.New("invalid reservation status")
-	ErrInvalidRole         = errors.New("вы не являетесь клиентом и не можете создать бронь")
-)
-
 func (r *bookingService) GetUserReservations(userID uint) ([]models.Reservation, error) {
 	reservations, err := r.repo.GetUserReservations(userID)
 
@@ -68,35 +54,35 @@ func (r *bookingService) GetByID(id uint) (*models.ReservationDetails, error) {
 func (r *bookingService) CreateReservation(reservation *dto.ReservationCreate, claims *models.Claims) (*models.ReservationDetails, error) {
 
 	if reservation.OwnerID <= 0 {
-		return nil, ErrOwnerID
+		return nil, errors.ErrOwnerID
 	}
 
 	if reservation.StartAt.IsZero() {
-		return nil, ErrStartAtEmpty
+		return nil, errors.ErrStartAtEmpty
 	}
 
 	if reservation.EndAt.IsZero() {
-		return nil, ErrEndAtEmpty
+		return nil, errors.ErrEndAtEmpty
 	}
 
 	if !reservation.StartAt.Before(reservation.EndAt) {
-		return nil, ErrStartAtAfterEndAt
+		return nil, errors.ErrStartAtAfterEndAt
 	}
 
 	if reservation.StartAt.Before(time.Now()) {
-		return nil, ErrStartAtInPast
+		return nil, errors.ErrStartAtInPast
 	}
 
 	if reservation.Price <= 0 {
-		return nil, ErrNegativePrice
+		return nil, errors.ErrNegativePrice
 	}
 
 	if reservation.Status == "" {
-		return nil, ErrStatusEmpty
+		return nil, errors.ErrStatusEmpty
 	}
 
 	if claims.Role != models.RoleClient && claims.Role != models.RoleAdmin {
-		return nil, ErrInvalidRole
+		return nil, errors.ErrInvalidRole
 	}
 
 	reservation.ClientID = claims.UserID
@@ -134,7 +120,6 @@ func (r *bookingService) CreateReservation(reservation *dto.ReservationCreate, c
 		return nil, fmt.Errorf("бронь создана (id=%d), но не удалось отправить событие в Kafka: %w", newReservation.ID, err)
 	}
 
-
 	return newReservation, nil
 }
 
@@ -145,7 +130,7 @@ func (r *bookingService) ReservationCancel(id uint, reason string) (*models.Rese
 	}
 
 	if reservation.Status == models.Cancelled || reservation.Status == models.Completed {
-		return nil, errors.New("cannot cancel reservation")
+		return nil, errors.ErrCannotCancel
 	}
 
 	reservation.Status = models.Cancelled
@@ -178,19 +163,19 @@ func (r *bookingService) ReservationUpdate(id uint, reservation *dto.Reservation
 	}
 
 	if reservation.ClientID != nil && *reservation.ClientID <= 0 {
-		return nil, ErrClientID
+		return nil, errors.ErrClientID
 	}
 
 	if reservation.OwnerID != nil && *reservation.OwnerID <= 0 {
-		return nil, ErrOwnerID
+		return nil, errors.ErrOwnerID
 	}
 
 	if reservation.StartAt != nil && reservation.StartAt.IsZero() {
-		return nil, ErrStartAtEmpty
+		return nil, errors.ErrStartAtEmpty
 	}
 
 	if reservation.EndAt != nil && reservation.EndAt.IsZero() {
-		return nil, ErrEndAtEmpty
+		return nil, errors.ErrEndAtEmpty
 	}
 
 	// Определяем финальные значения для валидации (не мутируя reserv заранее)
@@ -206,20 +191,20 @@ func (r *bookingService) ReservationUpdate(id uint, reservation *dto.Reservation
 
 	// Проверяем, что StartAt < EndAt для итогового диапазона
 	if !finalStartAt.Before(finalEndAt) {
-		return nil, ErrStartAtAfterEndAt
+		return nil, errors.ErrStartAtAfterEndAt
 	}
 
 	// Проверяем, что finalStartAt не в прошлом (независимо от того, обновляется ли он)
 	if finalStartAt.Before(time.Now()) {
-		return nil, ErrStartAtInPast
+		return nil, errors.ErrStartAtInPast
 	}
 
 	if reservation.Price != nil && *reservation.Price <= 0 {
-		return nil, ErrNegativePrice
+		return nil, errors.ErrNegativePrice
 	}
 
 	if reserv.Status != models.Pending {
-		return nil, errors.New("only pending reservations can be updated. Current status: " + string(reserv.Status))
+		return nil, errors.ErrOnlyPendingReservations
 	}
 
 	if reservation.VenueID != nil {
