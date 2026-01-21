@@ -16,4 +16,6 @@ var (
 	ErrInvalidRole             = errors.New("вы не являетесь клиентом и не можете создать бронь")
 	ErrCannotCancel            = errors.New("cannot cancel reservation")
 	ErrOnlyPendingReservations = errors.New("only pending reservations can be updated")
+	ErrNotOwner                = errors.New("you are not the owner of this venue")
+	ErrForbidden			   = errors.New("forbidden access to the resource")
 )
