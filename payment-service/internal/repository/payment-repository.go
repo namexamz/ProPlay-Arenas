@@ -3,6 +3,7 @@ package repository
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -11,6 +12,8 @@ import (
 )
 
 var ErrNotFound = errors.New("не найдено")
+
+var paymentRepoLogger = slog.Default()
 
 type PaymentRepository interface {
 	CreatePayment(payment *models.Payment) error
@@ -31,15 +34,22 @@ func NewPaymentRepository(db *gorm.DB) PaymentRepository {
 }
 
 func (r *PaymentRepositoryImpl) CreatePayment(payment *models.Payment) error {
-	return r.db.Create(payment).Error
+	if err := r.db.Create(payment).Error; err != nil {
+		paymentRepoLogger.Error("ошибка создания платежа", "error", err)
+		return err
+	}
+	paymentRepoLogger.Info("платеж создан", "payment_id", payment.ID)
+	return nil
 }
 
 func (r *PaymentRepositoryImpl) GetPaymentByID(id uint) (*models.Payment, error) {
 	var payment models.Payment
 	if err := r.db.First(&payment, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			paymentRepoLogger.Warn("платеж не найден", "payment_id", id)
 			return nil, fmt.Errorf("платеж не найден: %w", ErrNotFound)
 		}
+		paymentRepoLogger.Error("ошибка получения платежа по id", "payment_id", id, "error", err)
 		return nil, err
 	}
 	return &payment, nil
@@ -57,6 +67,7 @@ func (r *PaymentRepositoryImpl) GetPaymentsByUserID(userID uuid.UUID, limit, off
 	var total int64
 
 	if err := r.db.Where("user_id = ?", userID).Model(&models.Payment{}).Count(&total).Error; err != nil {
+		paymentRepoLogger.Error("ошибка подсчета платежей пользователя", "user_id", userID, "error", err)
 		return nil, 0, err
 	}
 
@@ -65,6 +76,7 @@ func (r *PaymentRepositoryImpl) GetPaymentsByUserID(userID uuid.UUID, limit, off
 		Limit(limit).
 		Offset(offset).
 		Find(&payments).Error; err != nil {
+		paymentRepoLogger.Error("ошибка получения платежей пользователя", "user_id", userID, "error", err)
 		return nil, 0, err
 	}
 
@@ -75,8 +87,10 @@ func (r *PaymentRepositoryImpl) GetPaymentByTransactionID(transactionID string) 
 	var payment models.Payment
 	if err := r.db.Where("transaction_id = ?", transactionID).First(&payment).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			paymentRepoLogger.Warn("платеж по transaction_id не найден", "transaction_id", transactionID)
 			return nil, fmt.Errorf("платеж по transaction_id не найден: %w", ErrNotFound)
 		}
+		paymentRepoLogger.Error("ошибка получения платежа по transaction_id", "transaction_id", transactionID, "error", err)
 		return nil, err
 	}
 	return &payment, nil
@@ -86,17 +100,29 @@ func (r *PaymentRepositoryImpl) GetPaymentByBookingID(bookingID uuid.UUID) (*mod
 	var payment models.Payment
 	if err := r.db.Where("booking_id = ?", bookingID).First(&payment).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			paymentRepoLogger.Warn("платеж по booking_id не найден", "booking_id", bookingID)
 			return nil, fmt.Errorf("платеж по booking_id не найден: %w", ErrNotFound)
 		}
+		paymentRepoLogger.Error("ошибка получения платежа по booking_id", "booking_id", bookingID, "error", err)
 		return nil, err
 	}
 	return &payment, nil
 }
 
 func (r *PaymentRepositoryImpl) UpdatePayment(payment *models.Payment) error {
-	return r.db.Save(payment).Error
+	if err := r.db.Save(payment).Error; err != nil {
+		paymentRepoLogger.Error("ошибка обновления платежа", "payment_id", payment.ID, "error", err)
+		return err
+	}
+	paymentRepoLogger.Info("платеж обновлен", "payment_id", payment.ID)
+	return nil
 }
 
 func (r *PaymentRepositoryImpl) DeletePayment(id uint) error {
-	return r.db.Delete(&models.Payment{}, id).Error
+	if err := r.db.Delete(&models.Payment{}, id).Error; err != nil {
+		paymentRepoLogger.Error("ошибка удаления платежа", "payment_id", id, "error", err)
+		return err
+	}
+	paymentRepoLogger.Info("платеж удален", "payment_id", id)
+	return nil
 }

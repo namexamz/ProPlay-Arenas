@@ -38,7 +38,6 @@ type Payment struct {
 	Currency       string        `gorm:"column:currency" json:"currency"`
 	Method         PaymentMethod `gorm:"column:method" json:"method"`
 	Status         PaymentStatus `gorm:"column:status" json:"status"`
-	TransactionID  string        `gorm:"column:transaction_id;uniqueIndex" json:"transaction_id"`
 	RefundedAmount int64         `gorm:"column:refunded_amount;default:0" json:"refunded_amount"`
 	PaidAt         *time.Time    `gorm:"column:paid_at" json:"paid_at"`
 	RefundedAt     *time.Time    `gorm:"column:refunded_at" json:"refunded_at"`

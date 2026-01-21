@@ -9,11 +9,11 @@ import (
 )
 
 type CreatePaymentRequest struct {
-	BookingID uuid.UUID            `json:"booking_id" binding:"required"`
-	UserID    uuid.UUID            `json:"user_id" binding:"required"`
+	BookingID uuid.UUID            `json:"booking_id" binding:"required,oneof=card cash"`
+	UserID    uuid.UUID            `json:"user_id" binding:"required,oneof=card cash"`
 	Amount    int64                `json:"amount" binding:"required,gt=0"`
-	Currency  string               `json:"currency" binding:"required"`
-	Method    models.PaymentMethod `json:"method" binding:"required"`
+	Currency  string               `json:"currency" binding:"required,oneof=card cash"`
+	Method    models.PaymentMethod `json:"method" binding:"required,oneof=card cash"`
 }
 
 type PaymentResponse struct {
@@ -24,7 +24,6 @@ type PaymentResponse struct {
 	Currency       string               `json:"currency"`
 	Method         models.PaymentMethod `json:"method"`
 	Status         models.PaymentStatus `json:"status"`
-	TransactionID  string               `json:"transaction_id"`
 	RefundedAmount int64                `json:"refunded_amount"`
 	PaidAt         *time.Time           `json:"paid_at"`
 	RefundedAt     *time.Time           `json:"refunded_at"`
