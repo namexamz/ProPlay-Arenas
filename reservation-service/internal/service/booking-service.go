@@ -49,11 +49,11 @@ func (r *bookingService) GetUserReservations(userID uint) ([]models.Reservation,
 func (r *bookingService) GetVenueBookings(venueID uint, claims *models.Claims) ([]models.ReservationDetails, error) {
 
 	if claims == nil {
-		return nil, ErrForbidden
+		return nil, errors.ErrForbidden
 	}
 
 	if claims.Role != models.RoleOwner && claims.Role != models.RoleAdmin {
-		return nil, ErrForbidden
+		return nil, errors.ErrForbidden
 	}
 
 	venue, err := r.GetVenue(venueID)
@@ -62,7 +62,7 @@ func (r *bookingService) GetVenueBookings(venueID uint, claims *models.Claims) (
 	}
 
 	if claims.Role != models.RoleAdmin && venue.OwnerID != claims.UserID {
-		return nil, ErrNotOwner
+		return nil, errors.ErrNotOwner
 	}
 
 	bookings, err := r.repo.GetVenueBookings(venueID)
