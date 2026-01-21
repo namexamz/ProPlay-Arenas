@@ -111,6 +111,8 @@ func (s *venueService) Update(id uint, venue *models.Venue) error {
 		return err
 	}
 
+	// PUT-семантика: обновляем все поля целиком
+	// Все обязательные поля уже валидированы на уровне транспорта
 	existingVenue.VenueType = venue.VenueType
 	existingVenue.OwnerID = venue.OwnerID
 	existingVenue.IsActive = venue.IsActive

@@ -9,16 +9,17 @@ import (
 
 // VenueDTO - DTO для запросов (Create/Update) и ответов
 // Время представлено в формате "HH:MM" как строки
+// Для PUT (Update) все поля обязательны - это полное обновление записи
 type VenueDTO struct {
 	ID        uint             `json:"id,omitempty"` // Только в ответах
-	VenueType models.VenueType `json:"venue_type"`
-	OwnerID   uint             `json:"owner_id"`
+	VenueType models.VenueType `json:"venue_type" binding:"required"`
+	OwnerID   uint             `json:"owner_id" binding:"required"`
 	IsActive  bool             `json:"is_active"`
-	HourPrice int              `json:"hour_price"`
-	District  string           `json:"district"`
-	StartTime string           `json:"start_time"` // Формат "HH:MM"
-	EndTime   string           `json:"end_time"`   // Формат "HH:MM"
-	Weekdays  models.Weekdays  `json:"weekdays"`
+	HourPrice int              `json:"hour_price" binding:"required"`
+	District  string           `json:"district" binding:"required"`
+	StartTime string           `json:"start_time" binding:"required"` // Формат "HH:MM"
+	EndTime   string           `json:"end_time" binding:"required"`   // Формат "HH:MM"
+	Weekdays  models.Weekdays  `json:"weekdays" binding:"required"`
 }
 
 // ScheduleDTO - DTO для расписания работы площадки (ответ)

@@ -177,11 +177,29 @@ func (h *VenueHandler) Update(c *gin.Context) {
 		return
 	}
 
+	// PUT-семантика: требуем все поля для полного обновления записи
 	var dto VenueDTO
 	if err := c.ShouldBindJSON(&dto); err != nil {
 		h.logger.Error("Ошибка парсинга JSON", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
+			"error": fmt.Sprintf("PUT требует все поля: %v", err),
+		})
+		return
+	}
+
+	// Валидация обязательных полей для PUT
+	// binding:"required" не работает для int/uint, проверяем вручную
+	if dto.OwnerID == 0 {
+		h.logger.Error("Отсутствует обязательное поле owner_id")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "PUT требует все поля: owner_id обязателен",
+		})
+		return
+	}
+	if dto.HourPrice < 0 {
+		h.logger.Error("Некорректное значение hour_price")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "hour_price не может быть отрицательным",
 		})
 		return
 	}
@@ -216,7 +234,13 @@ func (h *VenueHandler) Update(c *gin.Context) {
 	if err != nil {
 		// Нештатная ситуация: обновление прошло успешно, но запись недоступна при повторном запросе
 		// Возможные причины: проблема с БД, race condition, или запись была soft-deleted между обновлением и чтением
-		h.logger.Error("КРИТИЧЕСКАЯ ОШИБКА: обновление площадки успешно, но запись недоступна при повторном чтении", "id", id, "error", err)
+		h.logger.Error(
+			"КРИТИЧЕСКАЯ ОШИБКА: обновление площадки успешно, но запись недоступна при повторном чтении",
+			"id", id,
+			"error", err,
+			"severity", "critical",
+			"anomaly", true,
+		)
 		// Возвращаем 204 No Content, т.к. обновление прошло успешно, но вернуть данные не можем
 		c.Status(http.StatusNoContent)
 		return
@@ -322,7 +346,13 @@ func (h *VenueHandler) UpdateSchedule(c *gin.Context) {
 	if err != nil {
 		// Нештатная ситуация: обновление прошло успешно, но запись недоступна при повторном запросе
 		// Возможные причины: проблема с БД, race condition, или запись была soft-deleted между обновлением и чтением
-		h.logger.Error("КРИТИЧЕСКАЯ ОШИБКА: обновление расписания успешно, но запись недоступна при повторном чтении", "id", id, "error", err)
+		h.logger.Error(
+			"КРИТИЧЕСКАЯ ОШИБКА: обновление расписания успешно, но запись недоступна при повторном чтении",
+			"id", id,
+			"error", err,
+			"severity", "critical",
+			"anomaly", true,
+		)
 		// Возвращаем 204 No Content, т.к. обновление прошло успешно, но вернуть данные не можем
 		c.Status(http.StatusNoContent)
 		return
