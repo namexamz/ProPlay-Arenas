@@ -10,7 +10,7 @@ import (
 type BookingRepo interface {
 	GetByID(id uint) (*models.ReservationDetails, error)
 	GetUserReservations(userID uint) ([]models.Reservation, error)
-	GetVenueBookings(venueID uint, ownerID uint) ([]models.ReservationDetails, error)
+	GetVenueBookings(venueID uint) ([]models.ReservationDetails, error)
 	Create(reservation *models.ReservationDetails) error
 	Save(reservation *models.ReservationDetails) error
 }
@@ -63,10 +63,10 @@ func (r *gormBookingRepo) Save(reservation *models.ReservationDetails) error {
 	return result.Error
 }
 
-func (r *gormBookingRepo) GetVenueBookings(venueID uint, ownerID uint) ([]models.ReservationDetails, error) {
+func (r *gormBookingRepo) GetVenueBookings(venueID uint) ([]models.ReservationDetails, error) {
 	var bookings []models.ReservationDetails
 
-	result := r.db.Where("venue_id = ? AND owner_id = ?", venueID, ownerID).Find(&bookings)
+	result := r.db.Where("venue_id = ?", venueID).Find(&bookings)
 	if result.Error != nil {
 		return nil, result.Error
 	}

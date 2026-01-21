@@ -11,6 +11,7 @@ import (
 	"reservation/internal/repository"
 	"time"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
 )
 
@@ -45,6 +46,7 @@ var (
 	ErrInvalidStatus       = errors.New("invalid reservation status")
 	ErrInvalidRole         = errors.New("вы не являетесь клиентом и не можете создать бронь")
 	ErrForbidden           = errors.New("forbidden")
+	ErrNotOwner            = errors.New("user is not the owner of the venue")
 )
 
 func (r *bookingService) GetUserReservations(userID uint) ([]models.Reservation, error) {
@@ -67,7 +69,16 @@ func (r *bookingService) GetVenueBookings(venueID uint, claims *models.Claims) (
 		return nil, ErrForbidden
 	}
 
-	bookings, err := r.repo.GetVenueBookings(venueID, claims.UserID)
+	venue, err := r.GetVenue(venueID)
+	if err != nil {
+		return nil, err
+	}
+
+	if venue.OwnerID != claims.UserID {
+		return nil, ErrNotOwner
+	}
+
+	bookings, err := r.repo.GetVenueBookings(venueID)
 
 	if err != nil {
 		return nil, err
@@ -274,4 +285,24 @@ func (r *bookingService) ReservationUpdate(id uint, reservation *dto.Reservation
 
 	return reserv, nil
 
+}
+
+func (r *bookingService) GetVenue(id uint) (*dto.ResponsVenueServ, error) {
+
+	url := fmt.Sprintf("http://localhost:8081/venues/%d", id)
+	client := resty.New()
+
+	var venue dto.ResponsVenueServ
+
+	resp, err := client.R().SetResult(&venue).Get(url)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode() != 200 {
+		return nil, fmt.Errorf("Сервер вернул ошибку: %d", resp.StatusCode())
+	}
+
+	return &venue, nil
 }
