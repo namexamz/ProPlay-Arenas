@@ -10,6 +10,7 @@ import (
 type BookingRepo interface {
 	GetByID(id uint) (*models.ReservationDetails, error)
 	GetUserReservations(userID uint) ([]models.Reservation, error)
+	GetVenueBookings(venueID uint) ([]models.ReservationDetails, error)
 	Create(reservation *models.ReservationDetails) error
 	Save(reservation *models.ReservationDetails) error
 }
@@ -34,7 +35,7 @@ func (r *gormBookingRepo) GetUserReservations(userID uint) ([]models.Reservation
 		Select("start_at", "end_at", "status").
 		Find(&reservations)
 
-	if result.Error != nil { 
+	if result.Error != nil {
 		return nil, result.Error
 	}
 
@@ -60,4 +61,15 @@ func (r *gormBookingRepo) GetByID(id uint) (*models.ReservationDetails, error) {
 func (r *gormBookingRepo) Save(reservation *models.ReservationDetails) error {
 	result := r.db.Save(reservation)
 	return result.Error
+}
+
+func (r *gormBookingRepo) GetVenueBookings(venueID uint) ([]models.ReservationDetails, error) {
+	var bookings []models.ReservationDetails
+
+	result := r.db.Where("venue_id = ?", venueID).Find(&bookings)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return bookings, nil
 }

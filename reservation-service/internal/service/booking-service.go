@@ -9,13 +9,16 @@ import (
 	"reservation/internal/kafka"
 	"reservation/internal/models"
 	"reservation/internal/repository"
+	"strings"
 	"time"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
 )
 
 type BookingService interface {
 	GetUserReservations(userID uint) ([]models.Reservation, error)
+	GetVenueBookings(venueID uint, claims *models.Claims) ([]models.ReservationDetails, error)
 	CreateReservation(reservation *dto.ReservationCreate, claims *models.Claims) (*models.ReservationDetails, error)
 	ReservationCancel(id uint, reason string) (*models.ReservationDetails, error)
 	GetByID(id uint) (*models.ReservationDetails, error)
@@ -25,10 +28,12 @@ type BookingService interface {
 type bookingService struct {
 	repo     repository.BookingRepo
 	producer kafka.Producer
+	client   *resty.Client
+	venueURL string
 }
 
-func NewBookingServ(repo repository.BookingRepo, producer kafka.Producer) BookingService {
-	return &bookingService{repo: repo, producer: producer}
+func NewBookingServ(repo repository.BookingRepo, producer kafka.Producer, venueURL string) BookingService {
+	return &bookingService{repo: repo, producer: producer, client: resty.New(), venueURL: strings.TrimRight(venueURL, "/")}
 }
 
 func (r *bookingService) GetUserReservations(userID uint) ([]models.Reservation, error) {
@@ -39,6 +44,34 @@ func (r *bookingService) GetUserReservations(userID uint) ([]models.Reservation,
 	}
 
 	return reservations, nil
+}
+
+func (r *bookingService) GetVenueBookings(venueID uint, claims *models.Claims) ([]models.ReservationDetails, error) {
+
+	if claims == nil {
+		return nil, ErrForbidden
+	}
+
+	if claims.Role != models.RoleOwner && claims.Role != models.RoleAdmin {
+		return nil, ErrForbidden
+	}
+
+	venue, err := r.GetVenue(venueID)
+	if err != nil {
+		return nil, err
+	}
+
+	if claims.Role != models.RoleAdmin && venue.OwnerID != claims.UserID {
+		return nil, ErrNotOwner
+	}
+
+	bookings, err := r.repo.GetVenueBookings(venueID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return bookings, nil
 }
 
 func (r *bookingService) GetByID(id uint) (*models.ReservationDetails, error) {
@@ -239,4 +272,23 @@ func (r *bookingService) ReservationUpdate(id uint, reservation *dto.Reservation
 
 	return reserv, nil
 
+}
+
+func (r *bookingService) GetVenue(id uint) (*dto.ResponsVenueServ, error) {
+
+	url := fmt.Sprintf("%s/venues/%d", r.venueURL, id)
+
+	var venue dto.ResponsVenueServ
+
+	resp, err := r.client.R().SetResult(&venue).Get(url)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode() != 200 {
+		return nil, fmt.Errorf("Сервер вернул ошибку: %d", resp.StatusCode())
+	}
+
+	return &venue, nil
 }

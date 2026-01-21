@@ -40,7 +40,11 @@ func main() {
 	}()
 
 	bookingRepo := repository.NewBookingRepo(db)
-	bookingServ := service.NewBookingServ(bookingRepo, producer)
+	venueServiceURL := os.Getenv("VENUE_SERVICE_URL")
+	if venueServiceURL == "" {
+		log.Fatal("VENUE_SERVICE_URL не задан в переменных окружения")
+	}
+	bookingServ := service.NewBookingServ(bookingRepo, producer, venueServiceURL)
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {

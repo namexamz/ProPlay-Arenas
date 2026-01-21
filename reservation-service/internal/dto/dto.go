@@ -51,3 +51,8 @@ type BookingCancelledEvent struct {
 	Reason    string        `json:"reason"`
 	Status    models.Status `json:"status"`
 }
+
+type ResponsVenueServ struct {
+	ID      uint `json:"id"`
+	OwnerID uint `json:"owner_id"`
+}
