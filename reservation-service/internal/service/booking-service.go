@@ -16,6 +16,7 @@ import (
 
 type BookingService interface {
 	GetUserReservations(userID uint) ([]models.Reservation, error)
+	GetVenueBookings(venueID uint, claims *models.Claims) ([]models.ReservationDetails, error)
 	CreateReservation(reservation *dto.ReservationCreate, claims *models.Claims) (*models.ReservationDetails, error)
 	ReservationCancel(id uint, reason string) (*models.ReservationDetails, error)
 	GetByID(id uint) (*models.ReservationDetails, error)
@@ -43,6 +44,7 @@ var (
 	ErrReservationNotFound = errors.New("reservation not found")
 	ErrInvalidStatus       = errors.New("invalid reservation status")
 	ErrInvalidRole         = errors.New("вы не являетесь клиентом и не можете создать бронь")
+	ErrForbidden           = errors.New("forbidden")
 )
 
 func (r *bookingService) GetUserReservations(userID uint) ([]models.Reservation, error) {
@@ -53,6 +55,25 @@ func (r *bookingService) GetUserReservations(userID uint) ([]models.Reservation,
 	}
 
 	return reservations, nil
+}
+
+func (r *bookingService) GetVenueBookings(venueID uint, claims *models.Claims) ([]models.ReservationDetails, error) {
+
+	if claims == nil {
+		return nil, ErrForbidden
+	}
+
+	if claims.Role != models.RoleOwner && claims.Role != models.RoleAdmin {
+		return nil, ErrForbidden
+	}
+
+	bookings, err := r.repo.GetVenueBookings(venueID, claims.UserID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return bookings, nil
 }
 
 func (r *bookingService) GetByID(id uint) (*models.ReservationDetails, error) {
@@ -133,7 +154,6 @@ func (r *bookingService) CreateReservation(reservation *dto.ReservationCreate, c
 		log.Printf("Ошибка отправки события в Kafka: %v", err)
 		return nil, fmt.Errorf("бронь создана (id=%d), но не удалось отправить событие в Kafka: %w", newReservation.ID, err)
 	}
-
 
 	return newReservation, nil
 }

@@ -15,7 +15,7 @@ type BookingHandler struct {
 	bookingService service.BookingService
 }
 
-func NewBookingHandler( bookingService service.BookingService) *BookingHandler {
+func NewBookingHandler(bookingService service.BookingService) *BookingHandler {
 	return &BookingHandler{bookingService: bookingService}
 }
 
@@ -25,11 +25,12 @@ func (r *BookingHandler) Register(c *gin.Engine, jwtSecret string) {
 	c.GET("/bookings/:id", r.GetByID)
 	c.GET("/bookings", middleware.AuthMiddleware(jwtSecret), r.GetUserReservations)
 	c.PUT("/bookings/:id", middleware.AuthMiddleware(jwtSecret), r.UpdateReservation)
+	c.GET("/venues/:id/bookings", middleware.AuthMiddleware(jwtSecret), r.GetVenueBookings)
 }
 
 
 func (r *BookingHandler) CreateReservation(c *gin.Context) {
-	
+
 	claimsVal, ok := c.Get("claims")
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
@@ -48,7 +49,7 @@ func (r *BookingHandler) CreateReservation(c *gin.Context) {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-
+	
 
 	reservation, err := r.bookingService.CreateReservation(&req, claims)
 	if err != nil {
@@ -152,4 +153,34 @@ func (r *BookingHandler) UpdateReservation(c *gin.Context) {
 
 	c.JSON(200, reservation)
 
+}
+
+func (r *BookingHandler) GetVenueBookings(c *gin.Context) {
+	
+	claimsVal, ok := c.Get("claims")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	claims, ok := claimsVal.(*models.Claims)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid claims"})
+		return
+	}
+
+	idParam := c.Param("id")
+	id, err := strconv.Atoi(idParam)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid venue ID"})
+		return
+	}
+
+	bookings, err := r.bookingService.GetVenueBookings(uint(id), claims)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, bookings)
 }
