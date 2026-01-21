@@ -111,8 +111,6 @@ func (s *venueService) Update(id uint, venue *models.Venue) error {
 		return err
 	}
 
-	// Мержим переданные поля в existingVenue
-	// Репозиторий обновляет все поля явно через мапу, что позволяет обновлять поля в 0 или пустую строку
 	existingVenue.VenueType = venue.VenueType
 	existingVenue.OwnerID = venue.OwnerID
 	existingVenue.IsActive = venue.IsActive
