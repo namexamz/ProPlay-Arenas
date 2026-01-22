@@ -1,12 +1,10 @@
 package main
 
 import (
-	"log"
 	"os"
 
 	"log/slog"
 	"user-service/internal/config"
-	"user-service/internal/middleware"
 	"user-service/internal/repository"
 	service "user-service/internal/services"
 	"user-service/internal/transport"
@@ -16,50 +14,61 @@ import (
 )
 
 func main() {
-	// Загрузка переменных окружения из .env
-	if err := godotenv.Load(); err != nil {
-		log.Fatal("Ошибка загрузки .env файла: ", err)
+	// env
+	if os.Getenv("ENV") != "production" {
+		_ = godotenv.Load()
 	}
 
-	// Инициализация базы данных
-	config.ConnectDatabase()
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{}))
-	db := config.DB
+	// logger
+	logger := slog.New(
+		slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		}),
+	).With(slog.String("service", "user-service"))
 
-	// Инициализация репозиториев
+	db := config.ConnectDatabase()
+
+	// repos & services
 	userRepo := repository.NewUserRepository(logger, db)
-
-	// Получение секретного ключа из переменных окружения
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		log.Fatal("JWT_SECRET не задан в переменных окружения")
+		logger.Error("JWT_SECRET is not set")
+		os.Exit(1)
 	}
 
-	// Инициализация сервисов
-	authService := service.NewAuthService(jwtSecret, userRepo)
+	authService := service.NewAuthService(logger, jwtSecret, userRepo)
 	userService := service.NewUserService(logger, userRepo)
 
-	// Инициализация обработчиков
-	authHandler := transport.NewAuthHandler(authService)
+	// handlers
+	authHandler := transport.NewAuthHandler(logger, authService)
 	userHandler := transport.NewUserHandler(userService, logger)
 
-	// Настройка маршрутизатора
-	r := gin.Default()
+	// gin
+	gin.SetMode(gin.ReleaseMode)
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.SetTrustedProxies(nil)
 
-	// Маршруты без авторизации
-	authGroup := r.Group("/auth")
-	authHandler.RegisterRoutes(authGroup)
+	api := r.Group("/api")
 
-	// Маршруты с авторизацией
-	authorized := r.Group("/")
-	authorized.Use(middleware.AuthMiddleware(authService))
-	userHandler.RegisterRoutes(authorized)
+	auth := api.Group("/auth")
+	authHandler.RegisterRoutes(auth)
 
-	// Запуск сервера
+	protected := api.Group("/")
+	// protected.Use(transport.AuthMiddleware(jwtSecret))
+	userHandler.RegisterRoutes(protected)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-	log.Printf("Сервер запущен на порту %s", port)
-	r.Run(":" + port)
+
+	logger.Info("server started", slog.String("port", port))
+	
+
+	if err := r.Run(":" + port); err != nil {
+		logger.Error("server failed", slog.Any("error", err))
+	}
+
+
 }

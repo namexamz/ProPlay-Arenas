@@ -10,13 +10,12 @@ import (
 	"gorm.io/gorm"
 )
 
-var DB *gorm.DB
-
-func ConnectDatabase() {
+func ConnectDatabase() *gorm.DB {
 	dbHost := os.Getenv("DB_HOST")
 	dbUser := os.Getenv("DB_USER")
 	dbName := os.Getenv("DB_NAME")
 	dbPort := os.Getenv("DB_PORT")
+
 
 	if dbHost == "" || dbUser == "" || dbName == "" || dbPort == "" {
 		log.Fatal("One or more required environment variables are missing: DB_HOST, DB_USER, DB_NAME, DB_PORT")
@@ -41,5 +40,6 @@ func ConnectDatabase() {
 		log.Fatal("failed to auto-migrate models: ", err)
 	}
 
-	DB = db
+	return db
+
 }
