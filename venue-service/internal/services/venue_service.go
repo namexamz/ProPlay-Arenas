@@ -3,7 +3,6 @@ package services
 import (
 	"errors"
 	"log/slog"
-	"time"
 	"venue-service/internal/models"
 	"venue-service/internal/repository"
 
@@ -24,10 +23,7 @@ type VenueFilter struct {
 	Limit     int
 }
 
-type ScheduleUpdate struct {
-	StartTime time.Time `json:"start_time"`
-	EndTime   time.Time `json:"end_time"`
-}
+// ScheduleUpdate удален - теперь используется models.Weekdays напрямую
 
 type VenueService interface {
 	GetByID(id uint) (*models.Venue, error)
@@ -37,7 +33,7 @@ type VenueService interface {
 	Update(id uint, venue *models.Venue) error
 	Delete(id uint) error
 	GetSchedule(id uint) (*models.Venue, error)
-	UpdateSchedule(id uint, schedule ScheduleUpdate) error
+	UpdateSchedule(id uint, weekdays models.Weekdays) error
 }
 
 type venueService struct {
@@ -118,8 +114,6 @@ func (s *venueService) Update(id uint, venue *models.Venue) error {
 	existingVenue.IsActive = venue.IsActive
 	existingVenue.HourPrice = venue.HourPrice
 	existingVenue.District = venue.District
-	existingVenue.StartTime = venue.StartTime
-	existingVenue.EndTime = venue.EndTime
 	existingVenue.Weekdays = venue.Weekdays
 
 	if err := s.repository.Update(existingVenue); err != nil {
@@ -158,7 +152,7 @@ func (s *venueService) GetSchedule(id uint) (*models.Venue, error) {
 	return venue, nil
 }
 
-func (s *venueService) UpdateSchedule(id uint, schedule ScheduleUpdate) error {
+func (s *venueService) UpdateSchedule(id uint, weekdays models.Weekdays) error {
 	venue, err := s.repository.GetByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -167,9 +161,8 @@ func (s *venueService) UpdateSchedule(id uint, schedule ScheduleUpdate) error {
 		return err
 	}
 
-	// Обновляем только время работы
-	venue.StartTime = schedule.StartTime
-	venue.EndTime = schedule.EndTime
+	// Обновляем только расписание дней недели
+	venue.Weekdays = weekdays
 
 	if err := s.repository.Update(venue); err != nil {
 		s.logger.Error("Ошибка обновления расписания", "id", id, "error", err)

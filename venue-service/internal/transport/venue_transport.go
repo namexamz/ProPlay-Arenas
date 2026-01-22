@@ -147,6 +147,16 @@ func (h *VenueHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// Валидация VenueType
+	venueType := models.VenueType(dto.VenueType)
+	if !venueType.IsValid() {
+		h.logger.Error("Неверный тип площадки", "venue_type", dto.VenueType)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("неверный тип площадки: %s", dto.VenueType),
+		})
+		return
+	}
+
 	// Конвертируем DTO в модель
 	venue, err := FromVenueDTO(&dto)
 	if err != nil {
@@ -230,24 +240,6 @@ func (h *VenueHandler) Update(c *gin.Context) {
 		h.logger.Error("Отсутствует обязательное поле district")
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "PUT требует все поля: district обязателен",
-		})
-		return
-	}
-
-	// Проверка StartTime
-	if dto.StartTime == "" {
-		h.logger.Error("Отсутствует обязательное поле start_time")
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "PUT требует все поля: start_time обязателен",
-		})
-		return
-	}
-
-	// Проверка EndTime
-	if dto.EndTime == "" {
-		h.logger.Error("Отсутствует обязательное поле end_time")
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "PUT требует все поля: end_time обязателен",
 		})
 		return
 	}
@@ -362,8 +354,8 @@ func (h *VenueHandler) UpdateSchedule(c *gin.Context) {
 		return
 	}
 
-	// Конвертируем DTO в services.ScheduleUpdate
-	schedule, err := FromScheduleUpdateDTO(&dto)
+	// Конвертируем DTO в models.Weekdays
+	weekdays, err := FromScheduleUpdateDTO(&dto)
 	if err != nil {
 		h.logger.Error("Ошибка конвертации DTO расписания", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -372,7 +364,7 @@ func (h *VenueHandler) UpdateSchedule(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.UpdateSchedule(id, *schedule); err != nil {
+	if err := h.service.UpdateSchedule(id, *weekdays); err != nil {
 		if err == services.ErrVenueNotFound {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": err.Error(),
