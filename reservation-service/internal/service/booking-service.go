@@ -110,9 +110,6 @@ func (r *bookingService) CreateReservation(reservation *dto.ReservationCreate, c
 		return nil, errors.ErrStartAtInPast
 	}
 
-	if reservation.Price <= 0 {
-		return nil, errors.ErrNegativePrice
-	}
 
 	if reservation.Status == "" {
 		return nil, errors.ErrStatusEmpty
@@ -128,13 +125,18 @@ func (r *bookingService) CreateReservation(reservation *dto.ReservationCreate, c
 
 	reservation.ClientID = claims.UserID
 
+	venue, err := r.GetVenue(reservation.VenueID)
+	if err != nil {
+		return nil, err
+	}
+
 	newReservation := &models.ReservationDetails{
 		ClientID: reservation.ClientID,
 		VenueID:  reservation.VenueID,
 		OwnerID:  reservation.OwnerID,
 		StartAt:  reservation.StartAt,
 		EndAt:    reservation.EndAt,
-		Price:    float64(reservation.Price),
+		Price:    venue.HourPrice * reservation.EndAt.Sub(reservation.StartAt).Hours(),
 		Status:   models.Status(reservation.Status),
 		Duration: reservation.EndAt.Sub(reservation.StartAt),
 	}
