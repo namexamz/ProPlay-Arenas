@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -58,31 +59,49 @@ func (a *Aggregator) GetBookingSummary(c *gin.Context) {
 		return
 	}
 
-	venueBody, venueStatus, venueErr := a.fetchJSON(c, fmt.Sprintf("%s/venues/%d", a.venueURL, bookingLookup.VenueID))
-	paymentBody, paymentStatus, paymentErr := a.fetchJSON(c, fmt.Sprintf("%s/bookings/%s/payment", a.paymentURL, bookingID))
+	type fetchResult struct {
+		body   []byte
+		status int
+		err    error
+	}
+
+	var wg sync.WaitGroup
+	var venueRes fetchResult
+	var paymentRes fetchResult
+
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		venueRes.body, venueRes.status, venueRes.err = a.fetchJSON(c, fmt.Sprintf("%s/venues/%d", a.venueURL, bookingLookup.VenueID))
+	}()
+	go func() {
+		defer wg.Done()
+		paymentRes.body, paymentRes.status, paymentRes.err = a.fetchJSON(c, fmt.Sprintf("%s/bookings/%s/payment", a.paymentURL, bookingID))
+	}()
+	wg.Wait()
 
 	resp := models.BookingSummaryResponse{
 		Booking: bookingBody,
 	}
 
-	if venueErr != nil {
+	if venueRes.err != nil {
 		msg := "venue service unavailable"
 		resp.VenueError = &msg
-	} else if venueStatus != http.StatusOK {
-		msg := fmt.Sprintf("venue service status %d", venueStatus)
+	} else if venueRes.status != http.StatusOK {
+		msg := fmt.Sprintf("venue service status %d", venueRes.status)
 		resp.VenueError = &msg
 	} else {
-		resp.Venue = venueBody
+		resp.Venue = venueRes.body
 	}
 
-	if paymentErr != nil {
+	if paymentRes.err != nil {
 		msg := "payment service unavailable"
 		resp.PaymentError = &msg
-	} else if paymentStatus != http.StatusOK {
-		msg := fmt.Sprintf("payment service status %d", paymentStatus)
+	} else if paymentRes.status != http.StatusOK {
+		msg := fmt.Sprintf("payment service status %d", paymentRes.status)
 		resp.PaymentError = &msg
 	} else {
-		resp.Payment = paymentBody
+		resp.Payment = paymentRes.body
 	}
 
 	c.JSON(http.StatusOK, resp)
