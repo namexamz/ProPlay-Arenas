@@ -1,5 +1,5 @@
 run:
-	go run cmd/reservation-service/main.go
+	go run cmd/app/main.go
 fmt:
 	go fmt ./...
 lint:
