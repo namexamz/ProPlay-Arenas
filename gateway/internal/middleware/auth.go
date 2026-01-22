@@ -3,7 +3,6 @@ package middleware
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"gateway/internal/models"
@@ -51,7 +50,7 @@ func AuthUnless(jwtSecret string, isPublic func(*http.Request) bool) gin.Handler
 
 		c.Set("claims", claims)
 		c.Set("userID", claims.UserID)
-		c.Request.Header.Set("X-User-Id", strconv.FormatUint(uint64(claims.UserID), 10))
+		c.Request.Header.Set("X-User-Id", claims.UserID.String())
 		c.Request.Header.Set("X-User-Role", claims.Role)
 		c.Next()
 	}

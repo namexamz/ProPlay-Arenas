@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"gateway/internal/models"
 )
@@ -38,7 +38,7 @@ func (a *Aggregator) Register(rg *gin.RouterGroup) {
 
 func (a *Aggregator) GetBookingSummary(c *gin.Context) {
 	bookingID := c.Param("id")
-	if _, err := strconv.ParseUint(bookingID, 10, 64); err != nil {
+	if _, err := uuid.Parse(bookingID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid booking id"})
 		return
 	}
