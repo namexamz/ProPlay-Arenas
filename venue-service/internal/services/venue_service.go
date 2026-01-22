@@ -23,9 +23,7 @@ type VenueFilter struct {
 	Limit     int
 }
 
-type ScheduleUpdate struct {
-	Weekdays models.Weekdays `json:"weekdays"`
-}
+// ScheduleUpdate удален - теперь используется models.Weekdays напрямую
 
 type VenueService interface {
 	GetByID(id uint) (*models.Venue, error)
@@ -35,7 +33,7 @@ type VenueService interface {
 	Update(id uint, venue *models.Venue) error
 	Delete(id uint) error
 	GetSchedule(id uint) (*models.Venue, error)
-	UpdateSchedule(id uint, schedule ScheduleUpdate) error
+	UpdateSchedule(id uint, weekdays models.Weekdays) error
 }
 
 type venueService struct {
@@ -154,7 +152,7 @@ func (s *venueService) GetSchedule(id uint) (*models.Venue, error) {
 	return venue, nil
 }
 
-func (s *venueService) UpdateSchedule(id uint, schedule ScheduleUpdate) error {
+func (s *venueService) UpdateSchedule(id uint, weekdays models.Weekdays) error {
 	venue, err := s.repository.GetByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -164,7 +162,7 @@ func (s *venueService) UpdateSchedule(id uint, schedule ScheduleUpdate) error {
 	}
 
 	// Обновляем только расписание дней недели
-	venue.Weekdays = schedule.Weekdays
+	venue.Weekdays = weekdays
 
 	if err := s.repository.Update(venue); err != nil {
 		s.logger.Error("Ошибка обновления расписания", "id", id, "error", err)

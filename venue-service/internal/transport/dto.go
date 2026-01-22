@@ -121,42 +121,47 @@ func ToVenueDTOList(venues []models.Venue) []VenueDTO {
 	return dtoList
 }
 
+// fromWeekdaysDTO конвертирует WeekdaysDTO в models.Weekdays
+func fromWeekdaysDTO(dto WeekdaysDTO) (models.Weekdays, error) {
+	dayNames := []struct {
+		name     string
+		schedule DayScheduleDTO
+	}{
+		{"понедельник", dto.Monday},
+		{"вторник", dto.Tuesday},
+		{"среда", dto.Wednesday},
+		{"четверг", dto.Thursday},
+		{"пятница", dto.Friday},
+		{"суббота", dto.Saturday},
+		{"воскресенье", dto.Sunday},
+	}
+
+	schedules := make([]models.DaySchedule, 0, 7)
+	for _, day := range dayNames {
+		schedule, err := fromDayScheduleDTO(day.schedule)
+		if err != nil {
+			return models.Weekdays{}, fmt.Errorf("%s: %w", day.name, err)
+		}
+		schedules = append(schedules, schedule)
+	}
+
+	return models.Weekdays{
+		Monday:    schedules[0],
+		Tuesday:   schedules[1],
+		Wednesday: schedules[2],
+		Thursday:  schedules[3],
+		Friday:    schedules[4],
+		Saturday:  schedules[5],
+		Sunday:    schedules[6],
+	}, nil
+}
+
 // FromVenueDTO конвертирует DTO в модель Venue
 // Возвращает ошибку, если время имеет неверный формат
 func FromVenueDTO(dto *VenueDTO) (*models.Venue, error) {
-	monday, err := fromDayScheduleDTO(dto.Weekdays.Monday)
+	weekdays, err := fromWeekdaysDTO(dto.Weekdays)
 	if err != nil {
-		return nil, fmt.Errorf("понедельник: %w", err)
-	}
-
-	tuesday, err := fromDayScheduleDTO(dto.Weekdays.Tuesday)
-	if err != nil {
-		return nil, fmt.Errorf("вторник: %w", err)
-	}
-
-	wednesday, err := fromDayScheduleDTO(dto.Weekdays.Wednesday)
-	if err != nil {
-		return nil, fmt.Errorf("среда: %w", err)
-	}
-
-	thursday, err := fromDayScheduleDTO(dto.Weekdays.Thursday)
-	if err != nil {
-		return nil, fmt.Errorf("четверг: %w", err)
-	}
-
-	friday, err := fromDayScheduleDTO(dto.Weekdays.Friday)
-	if err != nil {
-		return nil, fmt.Errorf("пятница: %w", err)
-	}
-
-	saturday, err := fromDayScheduleDTO(dto.Weekdays.Saturday)
-	if err != nil {
-		return nil, fmt.Errorf("суббота: %w", err)
-	}
-
-	sunday, err := fromDayScheduleDTO(dto.Weekdays.Sunday)
-	if err != nil {
-		return nil, fmt.Errorf("воскресенье: %w", err)
+		return nil, err
 	}
 
 	venue := &models.Venue{
@@ -165,15 +170,7 @@ func FromVenueDTO(dto *VenueDTO) (*models.Venue, error) {
 		IsActive:  dto.IsActive,
 		HourPrice: dto.HourPrice,
 		District:  dto.District,
-		Weekdays: models.Weekdays{
-			Monday:    monday,
-			Tuesday:   tuesday,
-			Wednesday: wednesday,
-			Thursday:  thursday,
-			Friday:    friday,
-			Saturday:  saturday,
-			Sunday:    sunday,
-		},
+		Weekdays:  weekdays,
 	}
 
 	// Если есть ID (для обновления), устанавливаем его
@@ -201,48 +198,9 @@ func ToScheduleDTO(venue *models.Venue) ScheduleDTO {
 
 // FromScheduleUpdateDTO конвертирует ScheduleUpdateDTO в models.Weekdays
 func FromScheduleUpdateDTO(dto *ScheduleUpdateDTO) (*models.Weekdays, error) {
-	monday, err := fromDayScheduleDTO(dto.Weekdays.Monday)
+	weekdays, err := fromWeekdaysDTO(dto.Weekdays)
 	if err != nil {
-		return nil, fmt.Errorf("понедельник: %w", err)
+		return nil, err
 	}
-
-	tuesday, err := fromDayScheduleDTO(dto.Weekdays.Tuesday)
-	if err != nil {
-		return nil, fmt.Errorf("вторник: %w", err)
-	}
-
-	wednesday, err := fromDayScheduleDTO(dto.Weekdays.Wednesday)
-	if err != nil {
-		return nil, fmt.Errorf("среда: %w", err)
-	}
-
-	thursday, err := fromDayScheduleDTO(dto.Weekdays.Thursday)
-	if err != nil {
-		return nil, fmt.Errorf("четверг: %w", err)
-	}
-
-	friday, err := fromDayScheduleDTO(dto.Weekdays.Friday)
-	if err != nil {
-		return nil, fmt.Errorf("пятница: %w", err)
-	}
-
-	saturday, err := fromDayScheduleDTO(dto.Weekdays.Saturday)
-	if err != nil {
-		return nil, fmt.Errorf("суббота: %w", err)
-	}
-
-	sunday, err := fromDayScheduleDTO(dto.Weekdays.Sunday)
-	if err != nil {
-		return nil, fmt.Errorf("воскресенье: %w", err)
-	}
-
-	return &models.Weekdays{
-		Monday:    monday,
-		Tuesday:   tuesday,
-		Wednesday: wednesday,
-		Thursday:  thursday,
-		Friday:    friday,
-		Saturday:  saturday,
-		Sunday:    sunday,
-	}, nil
+	return &weekdays, nil
 }

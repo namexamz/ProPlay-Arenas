@@ -364,7 +364,7 @@ func (h *VenueHandler) UpdateSchedule(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.UpdateSchedule(id, services.ScheduleUpdate{Weekdays: *weekdays}); err != nil {
+	if err := h.service.UpdateSchedule(id, *weekdays); err != nil {
 		if err == services.ErrVenueNotFound {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": err.Error(),

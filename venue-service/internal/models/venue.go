@@ -87,11 +87,14 @@ func (v *Venue) validateVenue() error {
 	for _, day := range days {
 		if day.schedule.Enabled {
 			// Если день включен, StartTime и EndTime должны быть заданы
-			if day.schedule.StartTime == nil || day.schedule.EndTime == nil {
+			startTime := day.schedule.StartTime
+			endTime := day.schedule.EndTime
+			if startTime == nil || endTime == nil {
 				return fmt.Errorf("для %s время начала и окончания должны быть указаны", day.name)
 			}
 			// Проверка, что время начала раньше времени окончания
-			if !day.schedule.StartTime.Before(*day.schedule.EndTime) {
+			// После проверки на nil безопасно разыменовывать указатели
+			if !startTime.Before(*endTime) {
 				return fmt.Errorf("для %s время начала должно быть раньше времени окончания", day.name)
 			}
 		} else {
