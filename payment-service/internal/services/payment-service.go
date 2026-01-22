@@ -13,6 +13,7 @@ import (
 
 type PaymentService interface {
 	CreatePayment(req *dto.CreatePaymentRequest) (*models.Payment, error)
+	CreatePendingPayment(req *dto.CreatePaymentRequest) (*models.Payment, error)
 	GetPaymentByID(id uint) (*models.Payment, error)
 	GetPaymentByBookingID(bookingID uuid.UUID) (*models.Payment, error)
 	GetPaymentsByUserID(userID uuid.UUID, limit, offset int) ([]models.Payment, int64, error)
@@ -31,36 +32,11 @@ func NewPaymentService(paymentRepo repository.PaymentRepository) PaymentService 
 }
 
 func (s *PaymentServiceImpl) CreatePayment(req *dto.CreatePaymentRequest) (*models.Payment, error) {
-	if req == nil {
-		s.logger.Error("пустой запрос на создание платежа")
-		return nil, ErrEmptyRequest
-	}
-	if req.Currency == "" {
-		req.Currency = "RUB"
-	}
-	if !models.IsValidPaymentMethod(req.Method) {
-		s.logger.Error("недопустимый метод оплаты", "method", req.Method)
-		return nil, ErrInvalidMethod
-	}
+	return s.createPayment(req, models.PaymentStatusCompleted, true)
+}
 
-	payment := &models.Payment{
-		BookingID: req.BookingID,
-		UserID:    req.UserID,
-		Amount:    req.Amount,
-		Currency:  req.Currency,
-		Method:    req.Method,
-		Status:    models.PaymentStatusCompleted,
-	}
-	now := time.Now()
-	payment.PaidAt = &now
-
-	if err := s.paymentRepo.CreatePayment(payment); err != nil {
-		s.logger.Error("ошибка сохранения платежа", "error", err)
-		return nil, err
-	}
-
-	s.logger.Info("платеж создан", "payment_id", payment.ID)
-	return payment, nil
+func (s *PaymentServiceImpl) CreatePendingPayment(req *dto.CreatePaymentRequest) (*models.Payment, error) {
+	return s.createPayment(req, models.PaymentStatusPending, false)
 }
 
 func (s *PaymentServiceImpl) GetPaymentByID(id uint) (*models.Payment, error) {
@@ -88,4 +64,43 @@ func (s *PaymentServiceImpl) GetPaymentsByUserID(userID uuid.UUID, limit, offset
 		return nil, 0, err
 	}
 	return payments, total, nil
+}
+
+func (s *PaymentServiceImpl) createPayment(req *dto.CreatePaymentRequest, status models.PaymentStatus, setPaidAt bool) (*models.Payment, error) {
+	if req == nil {
+		s.logger.Error("пустой запрос на создание платежа")
+		return nil, ErrEmptyRequest
+	}
+	if req.Amount <= 0 {
+		s.logger.Error("некорректная сумма платежа", "amount", req.Amount)
+		return nil, ErrInvalidAmount
+	}
+	if req.Currency == "" {
+		req.Currency = "RUB"
+	}
+	if !models.IsValidPaymentMethod(req.Method) {
+		s.logger.Error("недопустимый метод оплаты", "method", req.Method)
+		return nil, ErrInvalidMethod
+	}
+
+	payment := &models.Payment{
+		BookingID: req.BookingID,
+		UserID:    req.UserID,
+		Amount:    req.Amount,
+		Currency:  req.Currency,
+		Method:    req.Method,
+		Status:    status,
+	}
+	if setPaidAt {
+		now := time.Now()
+		payment.PaidAt = &now
+	}
+
+	if err := s.paymentRepo.CreatePayment(payment); err != nil {
+		s.logger.Error("ошибка сохранения платежа", "error", err)
+		return nil, err
+	}
+
+	s.logger.Info("платеж создан", "payment_id", payment.ID)
+	return payment, nil
 }
