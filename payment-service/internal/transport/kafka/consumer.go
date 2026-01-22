@@ -72,8 +72,17 @@ func (c *Consumer) consumeBookingCreated(ctx context.Context) {
 	defer reader.Close()
 
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
 		msg, err := reader.ReadMessage(ctx)
 		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
 			c.logger.Error("ошибка чтения сообщения booking.created", "error", err)
 			continue
 		}
@@ -122,8 +131,17 @@ func (c *Consumer) consumeBookingCancelled(ctx context.Context) {
 	defer reader.Close()
 
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
 		msg, err := reader.ReadMessage(ctx)
 		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
 			c.logger.Error("ошибка чтения сообщения booking.cancelled", "error", err)
 			continue
 		}
@@ -154,11 +172,10 @@ func (c *Consumer) consumeBookingCancelled(ctx context.Context) {
 			continue
 		}
 
-		_, err = c.refundService.CreateRefund(payment.ID, &dto.RefundRequest{
+		if _, err := c.refundService.CreateRefund(payment.ID, &dto.RefundRequest{
 			Amount: remaining,
 			Reason: "отмена бронирования",
-		})
-		if err != nil {
+		}); err != nil {
 			c.logger.Error("ошибка создания возврата по booking.cancelled", "error", err, "payment_id", payment.ID)
 			continue
 		}
