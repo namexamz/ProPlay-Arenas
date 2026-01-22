@@ -311,24 +311,16 @@ func (r *bookingService) GetVenue(id uint) (*dto.ResponsVenueServ, error) {
 }
 
 func (r *bookingService) ValidateReservation(reservation *dto.ReservationCreate) error {
-	// Получаем данные площадки с расписанием
-	// Используем более полный DTO, если он доступен
-	url := fmt.Sprintf("%s/venues/%d", r.venueURL, reservation.VenueID)
-
-	var venueFull dto.ResponsVenueServFull
-	resp, err := r.client.R().SetResult(&venueFull).Get(url)
-	if err != nil {
-		return err
-	}
-
-	if resp.StatusCode() != 200 {
-		return fmt.Errorf("Сервер вернул ошибку: %d", resp.StatusCode())
-	}
-
 	// Проверка: бронь должна быть в пределах одного дня (расписание задаётся по дням)
 	if reservation.StartAt.Year() != reservation.EndAt.Year() ||
 		reservation.StartAt.YearDay() != reservation.EndAt.YearDay() {
 		return fmt.Errorf("бронь должна начинаться и заканчиваться в один день")
+	}
+
+	// Получаем расписание площадки
+	venueFull, err := r.getVenueSchedule(reservation.VenueID)
+	if err != nil {
+		return err
 	}
 
 	// Определяем день недели и соответствующее расписание
@@ -350,15 +342,41 @@ func (r *bookingService) ValidateReservation(reservation *dto.ReservationCreate)
 		day = venueFull.Weekdays.Weekdays.Sunday
 	}
 
+	if err := r.checkScheduleMatch(day, reservation.StartAt, reservation.EndAt); err != nil {
+		return err
+	}
+
+	if err := r.checkBookingConflicts(reservation.VenueID, reservation.StartAt, reservation.EndAt, nil); err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+// getVenueSchedule загружает полное представление площадки с расписанием
+func (r *bookingService) getVenueSchedule(venueID uint) (*dto.ResponsVenueServFull, error) {
+	url := fmt.Sprintf("%s/venues/%d", r.venueURL, venueID)
+	var venueFull dto.ResponsVenueServFull
+	resp, err := r.client.R().SetResult(&venueFull).Get(url)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode() != 200 {
+		return nil, fmt.Errorf("Сервер вернул ошибку: %d", resp.StatusCode())
+	}
+	return &venueFull, nil
+}
+
+// checkScheduleMatch проверяет, что бронь попадает в рабочее время дня и корректно парсит расписание
+func (r *bookingService) checkScheduleMatch(day dto.DayScheduleDTO, startAt, endAt time.Time) error {
 	if !day.Enabled {
 		return fmt.Errorf("площадка не работает в выбранный день")
 	}
-
 	if day.StartTime == nil || day.EndTime == nil {
 		return fmt.Errorf("в расписании площадки отсутствует время работы для выбранного дня")
 	}
 
-	// Парсим строки формата "15:04"
 	tStart, err := time.Parse("15:04", *day.StartTime)
 	if err != nil {
 		return fmt.Errorf("неверный формат start_time в расписании площадки: %w", err)
@@ -368,29 +386,35 @@ func (r *bookingService) ValidateReservation(reservation *dto.ReservationCreate)
 		return fmt.Errorf("неверный формат end_time в расписании площадки: %w", err)
 	}
 
-	venueStart := time.Date(reservation.StartAt.Year(), reservation.StartAt.Month(), reservation.StartAt.Day(),
-		tStart.Hour(), tStart.Minute(), 0, 0, reservation.StartAt.Location())
-	venueEnd := time.Date(reservation.EndAt.Year(), reservation.EndAt.Month(), reservation.EndAt.Day(),
-		tEnd.Hour(), tEnd.Minute(), 0, 0, reservation.EndAt.Location())
+	venueStart := time.Date(startAt.Year(), startAt.Month(), startAt.Day(), tStart.Hour(), tStart.Minute(), 0, 0, startAt.Location())
+	venueEnd := time.Date(endAt.Year(), endAt.Month(), endAt.Day(), tEnd.Hour(), tEnd.Minute(), 0, 0, endAt.Location())
 
-	if reservation.StartAt.Before(venueStart) || reservation.EndAt.After(venueEnd) {
+	if startAt.Before(venueStart) || endAt.After(venueEnd) {
 		return fmt.Errorf("бронь должна быть в пределах рабочего времени площадки: с %s по %s", (*day.StartTime), (*day.EndTime))
 	}
 
-	var count int64
+	return nil
+}
 
-	if err := r.db.Model(&models.Reservation{}).Where("venue_id = ? AND ((start_at < ? AND end_at > ?) OR (start_at < ? AND end_at > ?) OR (start_at >= ? AND end_at <= ?))",
-		reservation.VenueID, reservation.EndAt, reservation.EndAt, reservation.StartAt, reservation.StartAt, reservation.StartAt, reservation.EndAt).
-		Count(&count).Error; err != nil {
+// checkBookingConflicts проверяет наличие конфликтующих броней в БД.
+// Если excludeID != nil, то брони с этим id будут исключены (полезно для обновления).
+func (r *bookingService) checkBookingConflicts(venueID uint, startAt, endAt time.Time, excludeID *uint) error {
+	var count int64
+	q := r.db.Model(&models.Reservation{})
+	if excludeID != nil {
+		q = q.Where("venue_id = ? AND id <> ? AND ((start_at < ? AND end_at > ?) OR (start_at < ? AND end_at > ?) OR (start_at >= ? AND end_at <= ?))",
+			venueID, *excludeID, endAt, endAt, startAt, startAt, startAt, endAt)
+	} else {
+		q = q.Where("venue_id = ? AND ((start_at < ? AND end_at > ?) OR (start_at < ? AND end_at > ?) OR (start_at >= ? AND end_at <= ?))",
+			venueID, endAt, endAt, startAt, startAt, startAt, endAt)
+	}
+	if err := q.Count(&count).Error; err != nil {
 		return err
 	}
-
 	if count > 0 {
 		return fmt.Errorf("в выбранный период уже есть бронирования на эту площадку")
 	}
-
 	return nil
-
 }
 
 // ValidateReservationUpdate выполняет валидацию аналогичную ValidateReservation,
@@ -422,15 +446,10 @@ func (r *bookingService) ValidateReservationUpdate(id uint, reservation *dto.Res
 		return fmt.Errorf("бронь должна начинаться и заканчиваться в один день")
 	}
 
-	// Получаем данные площадки с расписанием
-	url := fmt.Sprintf("%s/venues/%d", r.venueURL, venueID)
-	var venueFull dto.ResponsVenueServFull
-	resp, err := r.client.R().SetResult(&venueFull).Get(url)
+	// Получаем расписание площадки
+	venueFull, err := r.getVenueSchedule(venueID)
 	if err != nil {
 		return err
-	}
-	if resp.StatusCode() != 200 {
-		return fmt.Errorf("Сервер вернул ошибку: %d", resp.StatusCode())
 	}
 
 	// Определяем день недели
@@ -452,40 +471,12 @@ func (r *bookingService) ValidateReservationUpdate(id uint, reservation *dto.Res
 		day = venueFull.Weekdays.Weekdays.Sunday
 	}
 
-	if !day.Enabled {
-		return fmt.Errorf("площадка не работает в выбранный день")
-	}
-
-	if day.StartTime == nil || day.EndTime == nil {
-		return fmt.Errorf("в расписании площадки отсутствует время работы для выбранного дня")
-	}
-
-	tStart, err := time.Parse("15:04", *day.StartTime)
-	if err != nil {
-		return fmt.Errorf("неверный формат start_time в расписании площадки: %w", err)
-	}
-	tEnd, err := time.Parse("15:04", *day.EndTime)
-	if err != nil {
-		return fmt.Errorf("неверный формат end_time в расписании площадки: %w", err)
-	}
-
-	venueStart := time.Date(finalStartAt.Year(), finalStartAt.Month(), finalStartAt.Day(), tStart.Hour(), tStart.Minute(), 0, 0, finalStartAt.Location())
-	venueEnd := time.Date(finalEndAt.Year(), finalEndAt.Month(), finalEndAt.Day(), tEnd.Hour(), tEnd.Minute(), 0, 0, finalEndAt.Location())
-
-	if finalStartAt.Before(venueStart) || finalEndAt.After(venueEnd) {
-		return fmt.Errorf("бронь должна быть в пределах рабочего времени площадки: с %s по %s", (*day.StartTime), (*day.EndTime))
-	}
-
-	var count int64
-	if err := r.db.Model(&models.Reservation{}).
-		Where("venue_id = ? AND id <> ? AND ((start_at < ? AND end_at > ?) OR (start_at < ? AND end_at > ?) OR (start_at >= ? AND end_at <= ?))",
-			venueID, id, finalEndAt, finalEndAt, finalStartAt, finalStartAt, finalStartAt, finalEndAt).
-		Count(&count).Error; err != nil {
+	if err := r.checkScheduleMatch(day, finalStartAt, finalEndAt); err != nil {
 		return err
 	}
 
-	if count > 0 {
-		return fmt.Errorf("в выбранный период уже есть бронирования на эту площадку")
+	if err := r.checkBookingConflicts(venueID, finalStartAt, finalEndAt, &id); err != nil {
+		return err
 	}
 
 	return nil
