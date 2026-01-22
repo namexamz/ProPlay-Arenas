@@ -3,7 +3,6 @@ package services
 import (
 	"errors"
 	"log/slog"
-	"time"
 	"venue-service/internal/models"
 	"venue-service/internal/repository"
 
@@ -25,8 +24,7 @@ type VenueFilter struct {
 }
 
 type ScheduleUpdate struct {
-	StartTime time.Time `json:"start_time"`
-	EndTime   time.Time `json:"end_time"`
+	Weekdays models.Weekdays `json:"weekdays"`
 }
 
 type VenueService interface {
@@ -118,8 +116,6 @@ func (s *venueService) Update(id uint, venue *models.Venue) error {
 	existingVenue.IsActive = venue.IsActive
 	existingVenue.HourPrice = venue.HourPrice
 	existingVenue.District = venue.District
-	existingVenue.StartTime = venue.StartTime
-	existingVenue.EndTime = venue.EndTime
 	existingVenue.Weekdays = venue.Weekdays
 
 	if err := s.repository.Update(existingVenue); err != nil {
@@ -167,9 +163,8 @@ func (s *venueService) UpdateSchedule(id uint, schedule ScheduleUpdate) error {
 		return err
 	}
 
-	// Обновляем только время работы
-	venue.StartTime = schedule.StartTime
-	venue.EndTime = schedule.EndTime
+	// Обновляем только расписание дней недели
+	venue.Weekdays = schedule.Weekdays
 
 	if err := s.repository.Update(venue); err != nil {
 		s.logger.Error("Ошибка обновления расписания", "id", id, "error", err)

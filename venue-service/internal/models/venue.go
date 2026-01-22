@@ -30,16 +30,24 @@ func (vt VenueType) String() string {
 	return string(vt)
 }
 
+// DaySchedule структура для расписания одного дня недели
+// Если Enabled = false, то StartTime и EndTime должны быть nil
+type DaySchedule struct {
+	Enabled   bool       `json:"enabled" gorm:"column:enabled;default:true"`              // Включен ли день для бронирования
+	StartTime *time.Time `json:"start_time,omitempty" gorm:"column:start_time;type:time"` // Время начала работы (nil если disabled)
+	EndTime   *time.Time `json:"end_time,omitempty" gorm:"column:end_time;type:time"`     // Время окончания работы (nil если disabled)
+}
+
 // Weekdays структура для дней недели, когда можно делать бронирования
-// true - можно делать бронь, false - нельзя
+// Каждый день имеет свое расписание (время начала и окончания работы)
 type Weekdays struct {
-	Monday    bool `json:"monday" gorm:"column:monday;default:true"`       // Понедельник
-	Tuesday   bool `json:"tuesday" gorm:"column:tuesday;default:true"`     // Вторник
-	Wednesday bool `json:"wednesday" gorm:"column:wednesday;default:true"` // Среда
-	Thursday  bool `json:"thursday" gorm:"column:thursday;default:true"`   // Четверг
-	Friday    bool `json:"friday" gorm:"column:friday;default:true"`       // Пятница
-	Saturday  bool `json:"saturday" gorm:"column:saturday;default:true"`   // Суббота
-	Sunday    bool `json:"sunday" gorm:"column:sunday;default:true"`       // Воскресенье
+	Monday    DaySchedule `json:"monday" gorm:"embedded;embeddedPrefix:monday_"`       // Понедельник
+	Tuesday   DaySchedule `json:"tuesday" gorm:"embedded;embeddedPrefix:tuesday_"`     // Вторник
+	Wednesday DaySchedule `json:"wednesday" gorm:"embedded;embeddedPrefix:wednesday_"` // Среда
+	Thursday  DaySchedule `json:"thursday" gorm:"embedded;embeddedPrefix:thursday_"`   // Четверг
+	Friday    DaySchedule `json:"friday" gorm:"embedded;embeddedPrefix:friday_"`       // Пятница
+	Saturday  DaySchedule `json:"saturday" gorm:"embedded;embeddedPrefix:saturday_"`   // Суббота
+	Sunday    DaySchedule `json:"sunday" gorm:"embedded;embeddedPrefix:sunday_"`       // Воскресенье
 }
 
 type Venue struct {
@@ -49,9 +57,7 @@ type Venue struct {
 	IsActive  bool      `json:"is_active" gorm:"column:is_active;default:true"`
 	HourPrice int       `json:"hour_price" gorm:"column:hour_price;not null;check:hour_price >= 0"`
 	District  string    `json:"district" gorm:"column:district;type:varchar(50);not null"`
-	StartTime time.Time `json:"start_time" gorm:"column:start_time;type:time;not null"` // Рабочее время начала
-	EndTime   time.Time `json:"end_time" gorm:"column:end_time;type:time;not null"`     // Рабочее время окончания
-	Weekdays  Weekdays  `json:"weekdays" gorm:"embedded"`                               // Дни недели для бронирования
+	Weekdays  Weekdays  `json:"weekdays" gorm:"embedded"` // Дни недели для бронирования с расписанием
 }
 
 func (Venue) TableName() string {
@@ -64,10 +70,36 @@ func (v *Venue) validateVenue() error {
 		return fmt.Errorf("неверный тип площадки: %s", v.VenueType)
 	}
 
-	// Проверка, что время начала раньше времени окончания
-	// Тип time в БД хранит только часы/минуты/секунды, поэтому можно сравнивать напрямую
-	if !v.StartTime.Before(v.EndTime) {
-		return fmt.Errorf("время начала должно быть раньше времени окончания")
+	// Проверяем расписание для каждого дня недели
+	days := []struct {
+		name     string
+		schedule DaySchedule
+	}{
+		{"понедельник", v.Weekdays.Monday},
+		{"вторник", v.Weekdays.Tuesday},
+		{"среда", v.Weekdays.Wednesday},
+		{"четверг", v.Weekdays.Thursday},
+		{"пятница", v.Weekdays.Friday},
+		{"суббота", v.Weekdays.Saturday},
+		{"воскресенье", v.Weekdays.Sunday},
+	}
+
+	for _, day := range days {
+		if day.schedule.Enabled {
+			// Если день включен, StartTime и EndTime должны быть заданы
+			if day.schedule.StartTime == nil || day.schedule.EndTime == nil {
+				return fmt.Errorf("для %s время начала и окончания должны быть указаны", day.name)
+			}
+			// Проверка, что время начала раньше времени окончания
+			if !day.schedule.StartTime.Before(*day.schedule.EndTime) {
+				return fmt.Errorf("для %s время начала должно быть раньше времени окончания", day.name)
+			}
+		} else {
+			// Если день выключен, StartTime и EndTime должны быть nil
+			if day.schedule.StartTime != nil || day.schedule.EndTime != nil {
+				return fmt.Errorf("для %s время начала и окончания должны быть nil, если день выключен", day.name)
+			}
+		}
 	}
 
 	return nil

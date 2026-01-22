@@ -9,6 +9,66 @@ import (
 	"gorm.io/gorm"
 )
 
+// createDaySchedule создает DaySchedule для одного дня
+func createDaySchedule(enabled bool, startHour, startMin, endHour, endMin int) models.DaySchedule {
+	schedule := models.DaySchedule{
+		Enabled: enabled,
+	}
+	if enabled {
+		now := time.Now()
+		startTime := time.Date(now.Year(), now.Month(), now.Day(), startHour, startMin, 0, 0, time.UTC)
+		endTime := time.Date(now.Year(), now.Month(), now.Day(), endHour, endMin, 0, 0, time.UTC)
+		schedule.StartTime = &startTime
+		schedule.EndTime = &endTime
+	}
+	return schedule
+}
+
+// createWeekdays создает Weekdays с одинаковым расписанием для всех дней
+func createWeekdays(startHour, startMin, endHour, endMin int, enabledDays ...bool) models.Weekdays {
+	// По умолчанию все дни включены
+	mondayEnabled := true
+	tuesdayEnabled := true
+	wednesdayEnabled := true
+	thursdayEnabled := true
+	fridayEnabled := true
+	saturdayEnabled := true
+	sundayEnabled := true
+
+	// Если переданы значения, используем их
+	if len(enabledDays) > 0 {
+		mondayEnabled = enabledDays[0]
+	}
+	if len(enabledDays) > 1 {
+		tuesdayEnabled = enabledDays[1]
+	}
+	if len(enabledDays) > 2 {
+		wednesdayEnabled = enabledDays[2]
+	}
+	if len(enabledDays) > 3 {
+		thursdayEnabled = enabledDays[3]
+	}
+	if len(enabledDays) > 4 {
+		fridayEnabled = enabledDays[4]
+	}
+	if len(enabledDays) > 5 {
+		saturdayEnabled = enabledDays[5]
+	}
+	if len(enabledDays) > 6 {
+		sundayEnabled = enabledDays[6]
+	}
+
+	return models.Weekdays{
+		Monday:    createDaySchedule(mondayEnabled, startHour, startMin, endHour, endMin),
+		Tuesday:   createDaySchedule(tuesdayEnabled, startHour, startMin, endHour, endMin),
+		Wednesday: createDaySchedule(wednesdayEnabled, startHour, startMin, endHour, endMin),
+		Thursday:  createDaySchedule(thursdayEnabled, startHour, startMin, endHour, endMin),
+		Friday:    createDaySchedule(fridayEnabled, startHour, startMin, endHour, endMin),
+		Saturday:  createDaySchedule(saturdayEnabled, startHour, startMin, endHour, endMin),
+		Sunday:    createDaySchedule(sundayEnabled, startHour, startMin, endHour, endMin),
+	}
+}
+
 // SeedVenues заполняет базу данных тестовыми площадками
 func SeedVenues(db *gorm.DB, logger *slog.Logger) error {
 	logger = logger.With("layer", "seed")
@@ -24,8 +84,6 @@ func SeedVenues(db *gorm.DB, logger *slog.Logger) error {
 		return nil
 	}
 
-	now := time.Now()
-
 	venues := []models.Venue{
 		// Футбольные площадки
 		{
@@ -34,17 +92,7 @@ func SeedVenues(db *gorm.DB, logger *slog.Logger) error {
 			IsActive:  true,
 			HourPrice: 1500,
 			District:  "Центральный",
-			StartTime: time.Date(now.Year(), now.Month(), now.Day(), 8, 0, 0, 0, time.UTC),
-			EndTime:   time.Date(now.Year(), now.Month(), now.Day(), 22, 0, 0, 0, time.UTC),
-			Weekdays: models.Weekdays{
-				Monday:    true,
-				Tuesday:   true,
-				Wednesday: true,
-				Thursday:  true,
-				Friday:    true,
-				Saturday:  true,
-				Sunday:    true,
-			},
+			Weekdays:  createWeekdays(8, 0, 22, 0),
 		},
 		{
 			VenueType: models.VenueFootball,
@@ -52,17 +100,7 @@ func SeedVenues(db *gorm.DB, logger *slog.Logger) error {
 			IsActive:  true,
 			HourPrice: 2000,
 			District:  "Северный",
-			StartTime: time.Date(now.Year(), now.Month(), now.Day(), 9, 0, 0, 0, time.UTC),
-			EndTime:   time.Date(now.Year(), now.Month(), now.Day(), 21, 0, 0, 0, time.UTC),
-			Weekdays: models.Weekdays{
-				Monday:    true,
-				Tuesday:   true,
-				Wednesday: true,
-				Thursday:  true,
-				Friday:    true,
-				Saturday:  true,
-				Sunday:    false, // Воскресенье выходной
-			},
+			Weekdays:  createWeekdays(9, 0, 21, 0, true, true, true, true, true, true, false), // Воскресенье выходной
 		},
 		{
 			VenueType: models.VenueFootball,
@@ -70,17 +108,7 @@ func SeedVenues(db *gorm.DB, logger *slog.Logger) error {
 			IsActive:  true,
 			HourPrice: 1200,
 			District:  "Южный",
-			StartTime: time.Date(now.Year(), now.Month(), now.Day(), 7, 0, 0, 0, time.UTC),
-			EndTime:   time.Date(now.Year(), now.Month(), now.Day(), 23, 0, 0, 0, time.UTC),
-			Weekdays: models.Weekdays{
-				Monday:    true,
-				Tuesday:   true,
-				Wednesday: true,
-				Thursday:  true,
-				Friday:    true,
-				Saturday:  true,
-				Sunday:    true,
-			},
+			Weekdays:  createWeekdays(7, 0, 23, 0),
 		},
 		// Баскетбольные площадки
 		{
@@ -89,17 +117,7 @@ func SeedVenues(db *gorm.DB, logger *slog.Logger) error {
 			IsActive:  true,
 			HourPrice: 1800,
 			District:  "Центральный",
-			StartTime: time.Date(now.Year(), now.Month(), now.Day(), 10, 0, 0, 0, time.UTC),
-			EndTime:   time.Date(now.Year(), now.Month(), now.Day(), 22, 0, 0, 0, time.UTC),
-			Weekdays: models.Weekdays{
-				Monday:    true,
-				Tuesday:   true,
-				Wednesday: true,
-				Thursday:  true,
-				Friday:    true,
-				Saturday:  true,
-				Sunday:    true,
-			},
+			Weekdays:  createWeekdays(10, 0, 22, 0),
 		},
 		{
 			VenueType: models.VenueBasketball,
@@ -107,17 +125,7 @@ func SeedVenues(db *gorm.DB, logger *slog.Logger) error {
 			IsActive:  true,
 			HourPrice: 2200,
 			District:  "Западный",
-			StartTime: time.Date(now.Year(), now.Month(), now.Day(), 8, 30, 0, 0, time.UTC),
-			EndTime:   time.Date(now.Year(), now.Month(), now.Day(), 20, 30, 0, 0, time.UTC),
-			Weekdays: models.Weekdays{
-				Monday:    true,
-				Tuesday:   true,
-				Wednesday: true,
-				Thursday:  true,
-				Friday:    true,
-				Saturday:  false, // Суббота выходной
-				Sunday:    false, // Воскресенье выходной
-			},
+			Weekdays:  createWeekdays(8, 30, 20, 30, true, true, true, true, true, false, false), // Суббота и воскресенье выходные
 		},
 		// Теннисные корты
 		{
@@ -126,17 +134,7 @@ func SeedVenues(db *gorm.DB, logger *slog.Logger) error {
 			IsActive:  true,
 			HourPrice: 2500,
 			District:  "Восточный",
-			StartTime: time.Date(now.Year(), now.Month(), now.Day(), 9, 0, 0, 0, time.UTC),
-			EndTime:   time.Date(now.Year(), now.Month(), now.Day(), 21, 0, 0, 0, time.UTC),
-			Weekdays: models.Weekdays{
-				Monday:    true,
-				Tuesday:   true,
-				Wednesday: true,
-				Thursday:  true,
-				Friday:    true,
-				Saturday:  true,
-				Sunday:    true,
-			},
+			Weekdays:  createWeekdays(9, 0, 21, 0),
 		},
 		{
 			VenueType: models.VenueTennis,
@@ -144,17 +142,7 @@ func SeedVenues(db *gorm.DB, logger *slog.Logger) error {
 			IsActive:  true,
 			HourPrice: 3000,
 			District:  "Центральный",
-			StartTime: time.Date(now.Year(), now.Month(), now.Day(), 8, 0, 0, 0, time.UTC),
-			EndTime:   time.Date(now.Year(), now.Month(), now.Day(), 22, 0, 0, 0, time.UTC),
-			Weekdays: models.Weekdays{
-				Monday:    true,
-				Tuesday:   true,
-				Wednesday: true,
-				Thursday:  true,
-				Friday:    true,
-				Saturday:  true,
-				Sunday:    true,
-			},
+			Weekdays:  createWeekdays(8, 0, 22, 0),
 		},
 		// Тренажерные залы
 		{
@@ -163,17 +151,7 @@ func SeedVenues(db *gorm.DB, logger *slog.Logger) error {
 			IsActive:  true,
 			HourPrice: 500,
 			District:  "Северный",
-			StartTime: time.Date(now.Year(), now.Month(), now.Day(), 6, 0, 0, 0, time.UTC),
-			EndTime:   time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 0, time.UTC),
-			Weekdays: models.Weekdays{
-				Monday:    true,
-				Tuesday:   true,
-				Wednesday: true,
-				Thursday:  true,
-				Friday:    true,
-				Saturday:  true,
-				Sunday:    true,
-			},
+			Weekdays:  createWeekdays(6, 0, 23, 59),
 		},
 		{
 			VenueType: models.VenueGym,
@@ -181,17 +159,7 @@ func SeedVenues(db *gorm.DB, logger *slog.Logger) error {
 			IsActive:  true,
 			HourPrice: 800,
 			District:  "Центральный",
-			StartTime: time.Date(now.Year(), now.Month(), now.Day(), 7, 0, 0, 0, time.UTC),
-			EndTime:   time.Date(now.Year(), now.Month(), now.Day(), 23, 0, 0, 0, time.UTC),
-			Weekdays: models.Weekdays{
-				Monday:    true,
-				Tuesday:   true,
-				Wednesday: true,
-				Thursday:  true,
-				Friday:    true,
-				Saturday:  true,
-				Sunday:    false, // Воскресенье выходной
-			},
+			Weekdays:  createWeekdays(7, 0, 23, 0, true, true, true, true, true, true, false), // Воскресенье выходной
 		},
 		// Бассейны
 		{
@@ -200,17 +168,7 @@ func SeedVenues(db *gorm.DB, logger *slog.Logger) error {
 			IsActive:  true,
 			HourPrice: 1000,
 			District:  "Южный",
-			StartTime: time.Date(now.Year(), now.Month(), now.Day(), 8, 0, 0, 0, time.UTC),
-			EndTime:   time.Date(now.Year(), now.Month(), now.Day(), 20, 0, 0, 0, time.UTC),
-			Weekdays: models.Weekdays{
-				Monday:    true,
-				Tuesday:   true,
-				Wednesday: true,
-				Thursday:  true,
-				Friday:    true,
-				Saturday:  true,
-				Sunday:    true,
-			},
+			Weekdays:  createWeekdays(8, 0, 20, 0),
 		},
 		{
 			VenueType: models.VenueSwimming,
@@ -218,17 +176,7 @@ func SeedVenues(db *gorm.DB, logger *slog.Logger) error {
 			IsActive:  false, // Деактивированная площадка для тестирования
 			HourPrice: 1500,
 			District:  "Восточный",
-			StartTime: time.Date(now.Year(), now.Month(), now.Day(), 9, 0, 0, 0, time.UTC),
-			EndTime:   time.Date(now.Year(), now.Month(), now.Day(), 19, 0, 0, 0, time.UTC),
-			Weekdays: models.Weekdays{
-				Monday:    true,
-				Tuesday:   true,
-				Wednesday: true,
-				Thursday:  true,
-				Friday:    true,
-				Saturday:  false,
-				Sunday:    false,
-			},
+			Weekdays:  createWeekdays(9, 0, 19, 0, true, true, true, true, true, false, false), // Суббота и воскресенье выходные
 		},
 	}
 
