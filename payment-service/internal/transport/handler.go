@@ -78,7 +78,7 @@ func (h *PaymentHandler) GetPaymentByID(c *gin.Context) {
 	payment, err := h.paymentService.GetPaymentByID(id)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			writeError(c, http.StatusNotFound, "НЕ_НАЙДЕНО", "404", "платеж не найден")
+			writeError(c, http.StatusNotFound, "ОШИБКА", "404", "платеж не найден")
 			return
 		}
 		h.logger.Error("ошибка получения платежа по id", "error", err, "payment_id", id)
@@ -90,7 +90,10 @@ func (h *PaymentHandler) GetPaymentByID(c *gin.Context) {
 }
 
 func (h *PaymentHandler) GetPaymentsHistory(c *gin.Context) {
-	userIDStr := c.Query("user_id")
+	userIDStr := c.GetHeader("X-User-Id")
+	if userIDStr == "" {
+		userIDStr = c.Query("user_id")
+	}
 	if userIDStr == "" {
 		writeError(c, http.StatusBadRequest, "НЕТ_ПАРАМЕТРА", "400", "отсутствует user_id")
 		return
@@ -138,7 +141,7 @@ func (h *PaymentHandler) CreateRefund(c *gin.Context) {
 	refund, err := h.refundService.CreateRefund(paymentID, &req)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			writeError(c, http.StatusNotFound, "НЕ_НАЙДЕНО", "404", "платеж не найден")
+			writeError(c, http.StatusNotFound, "ОШИБКА", "404", "платеж не найден")
 			return
 		}
 		if isClientError(err) {
@@ -163,7 +166,7 @@ func (h *PaymentHandler) GetPaymentByBookingID(c *gin.Context) {
 	payment, err := h.paymentService.GetPaymentByBookingID(bookingID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			writeError(c, http.StatusNotFound, "НЕ_НАЙДЕНО", "404", "платеж не найден")
+			writeError(c, http.StatusNotFound, "ERROR", "404", "платеж не найден")
 			return
 		}
 		h.logger.Error("ошибка получения платежа по booking_id", "error", err, "booking_id", bookingID)
@@ -240,6 +243,7 @@ func parseLimitOffset(c *gin.Context) (int, int) {
 
 func isClientError(err error) bool {
 	return errors.Is(err, services.ErrEmptyRequest) ||
+		errors.Is(err, services.ErrInvalidAmount) ||
 		errors.Is(err, services.ErrInvalidMethod) ||
 		errors.Is(err, services.ErrPaymentNotComplete) ||
 		errors.Is(err, services.ErrRefundAmountExceed)

@@ -1,6 +1,7 @@
 ﻿package main
 
 import (
+	"context"
 	"log/slog"
 	"os"
 
@@ -12,6 +13,7 @@ import (
 	"payment-service/internal/repository"
 	"payment-service/internal/services"
 	"payment-service/internal/transport"
+	kafkaconsumer "payment-service/internal/transport/kafka"
 )
 
 func main() {
@@ -37,6 +39,8 @@ func main() {
 	paymentService := services.NewPaymentService(paymentRepo)
 	refundService := services.NewRefundService(refundRepo, paymentRepo, db)
 	transportHandler := transport.NewPaymentHandler(paymentService, refundService, logger)
+	consumer := kafkaconsumer.NewConsumerFromEnv(paymentService, refundService, logger)
+	consumer.Start(context.Background())
 
 	r := gin.Default()
 	api := r.Group("/")
