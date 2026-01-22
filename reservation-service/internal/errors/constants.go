@@ -18,4 +18,5 @@ var (
 	ErrOnlyPendingReservations = errors.New("only pending reservations can be updated")
 	ErrNotOwner                = errors.New("you are not the owner of this venue")
 	ErrForbidden			   = errors.New("forbidden access to the resource")
+	ErrDuration             = errors.New("минимальная длительность бронирования - 1 час")
 )

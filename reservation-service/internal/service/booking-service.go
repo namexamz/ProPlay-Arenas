@@ -2,23 +2,26 @@ package service
 
 import (
 	"context"
-	"reservation/internal/errors"
 	"fmt"
 	"log"
 	"reservation/internal/dto"
+	"reservation/internal/errors"
 	"reservation/internal/kafka"
 	"reservation/internal/models"
 	"reservation/internal/repository"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type BookingService interface {
 	GetUserReservations(userID uint) ([]models.Reservation, error)
 	GetVenueBookings(venueID uint, claims *models.Claims) ([]models.ReservationDetails, error)
+	GetVenueAvailability(venueID uint, date time.Time) ([]dto.AvailableSlot, error)
 	CreateReservation(reservation *dto.ReservationCreate, claims *models.Claims) (*models.ReservationDetails, error)
 	ReservationCancel(id uint, reason string) (*models.ReservationDetails, error)
 	GetByID(id uint) (*models.ReservationDetails, error)
@@ -30,10 +33,11 @@ type bookingService struct {
 	producer kafka.Producer
 	client   *resty.Client
 	venueURL string
+	db       *gorm.DB
 }
 
-func NewBookingServ(repo repository.BookingRepo, producer kafka.Producer, venueURL string) BookingService {
-	return &bookingService{repo: repo, producer: producer, client: resty.New(), venueURL: strings.TrimRight(venueURL, "/")}
+func NewBookingServ(repo repository.BookingRepo, producer kafka.Producer, venueURL string, db *gorm.DB) BookingService {
+	return &bookingService{repo: repo, producer: producer, client: resty.New(), venueURL: strings.TrimRight(venueURL, "/"), db: db}
 }
 
 func (r *bookingService) GetUserReservations(userID uint) ([]models.Reservation, error) {
@@ -118,6 +122,10 @@ func (r *bookingService) CreateReservation(reservation *dto.ReservationCreate, c
 		return nil, errors.ErrInvalidRole
 	}
 
+	if err := r.ValidateReservation(reservation); err != nil {
+		return nil, err
+	}
+
 	reservation.ClientID = claims.UserID
 
 	newReservation := &models.ReservationDetails{
@@ -129,6 +137,10 @@ func (r *bookingService) CreateReservation(reservation *dto.ReservationCreate, c
 		Price:    float64(reservation.Price),
 		Status:   models.Status(reservation.Status),
 		Duration: reservation.EndAt.Sub(reservation.StartAt),
+	}
+
+	if newReservation.Duration < time.Hour {
+		return nil, errors.ErrDuration
 	}
 
 	if err := r.repo.Create(newReservation); err != nil {
@@ -232,6 +244,11 @@ func (r *bookingService) ReservationUpdate(id uint, reservation *dto.Reservation
 		return nil, errors.ErrStartAtInPast
 	}
 
+	// Дополнительная валидация: проверка расписания площадки и конфликтов броней
+	if err := r.ValidateReservationUpdate(id, reservation); err != nil {
+		return nil, err
+	}
+
 	if reservation.Price != nil && *reservation.Price <= 0 {
 		return nil, errors.ErrNegativePrice
 	}
@@ -291,4 +308,315 @@ func (r *bookingService) GetVenue(id uint) (*dto.ResponsVenueServ, error) {
 	}
 
 	return &venue, nil
+}
+
+func (r *bookingService) ValidateReservation(reservation *dto.ReservationCreate) error {
+	// Получаем данные площадки с расписанием
+	// Используем более полный DTO, если он доступен
+	url := fmt.Sprintf("%s/venues/%d", r.venueURL, reservation.VenueID)
+
+	var venueFull dto.ResponsVenueServFull
+	resp, err := r.client.R().SetResult(&venueFull).Get(url)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode() != 200 {
+		return fmt.Errorf("Сервер вернул ошибку: %d", resp.StatusCode())
+	}
+
+	// Проверка: бронь должна быть в пределах одного дня (расписание задаётся по дням)
+	if reservation.StartAt.Year() != reservation.EndAt.Year() ||
+		reservation.StartAt.YearDay() != reservation.EndAt.YearDay() {
+		return fmt.Errorf("бронь должна начинаться и заканчиваться в один день")
+	}
+
+	// Определяем день недели и соответствующее расписание
+	var day dto.DayScheduleDTO
+	switch reservation.StartAt.Weekday() {
+	case time.Monday:
+		day = venueFull.Weekdays.Weekdays.Monday
+	case time.Tuesday:
+		day = venueFull.Weekdays.Weekdays.Tuesday
+	case time.Wednesday:
+		day = venueFull.Weekdays.Weekdays.Wednesday
+	case time.Thursday:
+		day = venueFull.Weekdays.Weekdays.Thursday
+	case time.Friday:
+		day = venueFull.Weekdays.Weekdays.Friday
+	case time.Saturday:
+		day = venueFull.Weekdays.Weekdays.Saturday
+	case time.Sunday:
+		day = venueFull.Weekdays.Weekdays.Sunday
+	}
+
+	if !day.Enabled {
+		return fmt.Errorf("площадка не работает в выбранный день")
+	}
+
+	if day.StartTime == nil || day.EndTime == nil {
+		return fmt.Errorf("в расписании площадки отсутствует время работы для выбранного дня")
+	}
+
+	// Парсим строки формата "15:04"
+	tStart, err := time.Parse("15:04", *day.StartTime)
+	if err != nil {
+		return fmt.Errorf("неверный формат start_time в расписании площадки: %w", err)
+	}
+	tEnd, err := time.Parse("15:04", *day.EndTime)
+	if err != nil {
+		return fmt.Errorf("неверный формат end_time в расписании площадки: %w", err)
+	}
+
+	venueStart := time.Date(reservation.StartAt.Year(), reservation.StartAt.Month(), reservation.StartAt.Day(),
+		tStart.Hour(), tStart.Minute(), 0, 0, reservation.StartAt.Location())
+	venueEnd := time.Date(reservation.EndAt.Year(), reservation.EndAt.Month(), reservation.EndAt.Day(),
+		tEnd.Hour(), tEnd.Minute(), 0, 0, reservation.EndAt.Location())
+
+	if reservation.StartAt.Before(venueStart) || reservation.EndAt.After(venueEnd) {
+		return fmt.Errorf("бронь должна быть в пределах рабочего времени площадки: с %s по %s", (*day.StartTime), (*day.EndTime))
+	}
+
+	var count int64
+
+	if err := r.db.Model(&models.Reservation{}).Where("venue_id = ? AND ((start_at < ? AND end_at > ?) OR (start_at < ? AND end_at > ?) OR (start_at >= ? AND end_at <= ?))",
+		reservation.VenueID, reservation.EndAt, reservation.EndAt, reservation.StartAt, reservation.StartAt, reservation.StartAt, reservation.EndAt).
+		Count(&count).Error; err != nil {
+		return err
+	}
+
+	if count > 0 {
+		return fmt.Errorf("в выбранный период уже есть бронирования на эту площадку")
+	}
+
+	return nil
+
+}
+
+// ValidateReservationUpdate выполняет валидацию аналогичную ValidateReservation,
+// но для DTO обновления брони. Принимает id существующей брони и dto.ReservationUpdate.
+func (r *bookingService) ValidateReservationUpdate(id uint, reservation *dto.ReservationUpdate) error {
+	// Получаем текущую бронь
+	current, err := r.repo.GetByID(id)
+	if err != nil {
+		return err
+	}
+
+	// Определяем итоговые значения для проверки
+	venueID := current.VenueID
+	if reservation.VenueID != nil {
+		venueID = *reservation.VenueID
+	}
+
+	finalStartAt := current.StartAt
+	if reservation.StartAt != nil {
+		finalStartAt = *reservation.StartAt
+	}
+	finalEndAt := current.EndAt
+	if reservation.EndAt != nil {
+		finalEndAt = *reservation.EndAt
+	}
+
+	// Бронь должна быть в пределах одного дня
+	if finalStartAt.Year() != finalEndAt.Year() || finalStartAt.YearDay() != finalEndAt.YearDay() {
+		return fmt.Errorf("бронь должна начинаться и заканчиваться в один день")
+	}
+
+	// Получаем данные площадки с расписанием
+	url := fmt.Sprintf("%s/venues/%d", r.venueURL, venueID)
+	var venueFull dto.ResponsVenueServFull
+	resp, err := r.client.R().SetResult(&venueFull).Get(url)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode() != 200 {
+		return fmt.Errorf("Сервер вернул ошибку: %d", resp.StatusCode())
+	}
+
+	// Определяем день недели
+	var day dto.DayScheduleDTO
+	switch finalStartAt.Weekday() {
+	case time.Monday:
+		day = venueFull.Weekdays.Weekdays.Monday
+	case time.Tuesday:
+		day = venueFull.Weekdays.Weekdays.Tuesday
+	case time.Wednesday:
+		day = venueFull.Weekdays.Weekdays.Wednesday
+	case time.Thursday:
+		day = venueFull.Weekdays.Weekdays.Thursday
+	case time.Friday:
+		day = venueFull.Weekdays.Weekdays.Friday
+	case time.Saturday:
+		day = venueFull.Weekdays.Weekdays.Saturday
+	case time.Sunday:
+		day = venueFull.Weekdays.Weekdays.Sunday
+	}
+
+	if !day.Enabled {
+		return fmt.Errorf("площадка не работает в выбранный день")
+	}
+
+	if day.StartTime == nil || day.EndTime == nil {
+		return fmt.Errorf("в расписании площадки отсутствует время работы для выбранного дня")
+	}
+
+	tStart, err := time.Parse("15:04", *day.StartTime)
+	if err != nil {
+		return fmt.Errorf("неверный формат start_time в расписании площадки: %w", err)
+	}
+	tEnd, err := time.Parse("15:04", *day.EndTime)
+	if err != nil {
+		return fmt.Errorf("неверный формат end_time в расписании площадки: %w", err)
+	}
+
+	venueStart := time.Date(finalStartAt.Year(), finalStartAt.Month(), finalStartAt.Day(), tStart.Hour(), tStart.Minute(), 0, 0, finalStartAt.Location())
+	venueEnd := time.Date(finalEndAt.Year(), finalEndAt.Month(), finalEndAt.Day(), tEnd.Hour(), tEnd.Minute(), 0, 0, finalEndAt.Location())
+
+	if finalStartAt.Before(venueStart) || finalEndAt.After(venueEnd) {
+		return fmt.Errorf("бронь должна быть в пределах рабочего времени площадки: с %s по %s", (*day.StartTime), (*day.EndTime))
+	}
+
+	var count int64
+	if err := r.db.Model(&models.Reservation{}).
+		Where("venue_id = ? AND id <> ? AND ((start_at < ? AND end_at > ?) OR (start_at < ? AND end_at > ?) OR (start_at >= ? AND end_at <= ?))",
+			venueID, id, finalEndAt, finalEndAt, finalStartAt, finalStartAt, finalStartAt, finalEndAt).
+		Count(&count).Error; err != nil {
+		return err
+	}
+
+	if count > 0 {
+		return fmt.Errorf("в выбранный период уже есть бронирования на эту площадку")
+	}
+
+	return nil
+}
+
+// GetVenueAvailability возвращает свободные слоты площадки на дату
+func (r *bookingService) GetVenueAvailability(venueID uint, date time.Time) ([]dto.AvailableSlot, error) {
+	// Получаем данные площадки с расписанием
+	url := fmt.Sprintf("%s/venues/%d", r.venueURL, venueID)
+	var venueFull dto.ResponsVenueServFull
+	resp, err := r.client.R().SetResult(&venueFull).Get(url)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode() != 200 {
+		return nil, fmt.Errorf("Сервер вернул ошибку: %d", resp.StatusCode())
+	}
+
+	// Определяем день недели
+	var day dto.DayScheduleDTO
+	switch date.Weekday() {
+	case time.Monday:
+		day = venueFull.Weekdays.Weekdays.Monday
+	case time.Tuesday:
+		day = venueFull.Weekdays.Weekdays.Tuesday
+	case time.Wednesday:
+		day = venueFull.Weekdays.Weekdays.Wednesday
+	case time.Thursday:
+		day = venueFull.Weekdays.Weekdays.Thursday
+	case time.Friday:
+		day = venueFull.Weekdays.Weekdays.Friday
+	case time.Saturday:
+		day = venueFull.Weekdays.Weekdays.Saturday
+	case time.Sunday:
+		day = venueFull.Weekdays.Weekdays.Sunday
+	}
+
+	if !day.Enabled {
+		// площадка не работает в этот день — нет слотов
+		return []dto.AvailableSlot{}, nil
+	}
+
+	if day.StartTime == nil || day.EndTime == nil {
+		return nil, fmt.Errorf("в расписании площадки отсутствует время работы для выбранного дня")
+	}
+
+	tStart, err := time.Parse("15:04", *day.StartTime)
+	if err != nil {
+		return nil, fmt.Errorf("неверный формат start_time в расписании площадки: %w", err)
+	}
+	tEnd, err := time.Parse("15:04", *day.EndTime)
+	if err != nil {
+		return nil, fmt.Errorf("неверный формат end_time в расписании площадки: %w", err)
+	}
+
+	venueStart := time.Date(date.Year(), date.Month(), date.Day(), tStart.Hour(), tStart.Minute(), 0, 0, time.UTC)
+	venueEnd := time.Date(date.Year(), date.Month(), date.Day(), tEnd.Hour(), tEnd.Minute(), 0, 0, time.UTC)
+
+	// Получаем все брони площадки
+	bookings, err := r.repo.GetVenueBookings(venueID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Собираем интервал занятых времён в рабочем дне
+	type interval struct {
+		start time.Time
+		end   time.Time
+	}
+
+	var intervals []interval
+
+	for _, b := range bookings {
+		if b.Status == models.Cancelled {
+			continue
+		}
+		// Отбираем брони по дате
+		if b.StartAt.Year() != date.Year() || b.StartAt.YearDay() != date.YearDay() {
+			continue
+		}
+		// Если бронь вне рабочего времени — пропускаем или обрезаем
+		if b.EndAt.Before(venueStart) || b.StartAt.After(venueEnd) {
+			continue
+		}
+		s := b.StartAt
+		if s.Before(venueStart) {
+			s = venueStart
+		}
+		e := b.EndAt
+		if e.After(venueEnd) {
+			e = venueEnd
+		}
+		intervals = append(intervals, interval{start: s, end: e})
+	}
+
+	// Сортируем по start
+	sort.Slice(intervals, func(i, j int) bool {
+		return intervals[i].start.Before(intervals[j].start)
+	})
+
+	// Сливаем перекрывающиеся интервалы и определяем свободные промежутки
+	var slots []dto.AvailableSlot
+	prev := venueStart
+	for _, it := range intervals {
+		if it.start.After(prev) {
+			slots = append(slots, dto.AvailableSlot{StartAt: prev, EndAt: it.start})
+		}
+		if it.end.After(prev) {
+			prev = it.end
+		}
+	}
+
+	if prev.Before(venueEnd) {
+		slots = append(slots, dto.AvailableSlot{StartAt: prev, EndAt: venueEnd})
+	}
+
+	// Если нет броней — вернуть один слот рабочего времени (если длительность >= 1ч)
+	if len(intervals) == 0 {
+		if venueEnd.Sub(venueStart) >= time.Hour {
+			return []dto.AvailableSlot{{StartAt: venueStart, EndAt: venueEnd}}, nil
+		}
+		return []dto.AvailableSlot{}, nil
+	}
+
+	// Отфильтруем слоты короче 1 часа (минимальная длительность брони)
+	var filtered []dto.AvailableSlot
+	for _, s := range slots {
+		if s.EndAt.Sub(s.StartAt) >= time.Hour {
+			filtered = append(filtered, s)
+		}
+	}
+
+	return filtered, nil
 }

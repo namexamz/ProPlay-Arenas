@@ -7,6 +7,7 @@ import (
 	"reservation/internal/models"
 	"reservation/internal/service"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,14 +21,14 @@ func NewBookingHandler(bookingService service.BookingService) *BookingHandler {
 }
 
 func (r *BookingHandler) Register(c *gin.Engine, jwtSecret string) {
-	c.POST("/booking", middleware.AuthMiddleware(jwtSecret), r.CreateReservation)
+	c.POST("/bookings", middleware.AuthMiddleware(jwtSecret), r.CreateReservation)
 	c.POST("/bookings/:id/cancel", middleware.AuthMiddleware(jwtSecret), r.CancelReservation)
 	c.GET("/bookings/:id", r.GetByID)
 	c.GET("/bookings", middleware.AuthMiddleware(jwtSecret), r.GetUserReservations)
 	c.PUT("/bookings/:id", middleware.AuthMiddleware(jwtSecret), r.UpdateReservation)
 	c.GET("/venues/:id/bookings", middleware.AuthMiddleware(jwtSecret), r.GetVenueBookings)
+	c.GET("/venues/:id/availability", r.GetVenueAvailability)
 }
-
 
 func (r *BookingHandler) CreateReservation(c *gin.Context) {
 
@@ -49,7 +50,6 @@ func (r *BookingHandler) CreateReservation(c *gin.Context) {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-	
 
 	reservation, err := r.bookingService.CreateReservation(&req, claims)
 	if err != nil {
@@ -156,7 +156,7 @@ func (r *BookingHandler) UpdateReservation(c *gin.Context) {
 }
 
 func (r *BookingHandler) GetVenueBookings(c *gin.Context) {
-	
+
 	claimsVal, ok := c.Get("claims")
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
@@ -183,4 +183,33 @@ func (r *BookingHandler) GetVenueBookings(c *gin.Context) {
 	}
 
 	c.JSON(200, bookings)
+}
+
+func (r *BookingHandler) GetVenueAvailability(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.Atoi(idParam)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid venue ID"})
+		return
+	}
+
+	dateStr := c.Query("date")
+	var date time.Time
+	if dateStr == "" {
+		date = time.Now()
+	} else {
+		date, err = time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			c.JSON(400, gin.H{"error": "invalid date format, use YYYY-MM-DD"})
+			return
+		}
+	}
+
+	slots, err := r.bookingService.GetVenueAvailability(uint(id), date)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, slots)
 }

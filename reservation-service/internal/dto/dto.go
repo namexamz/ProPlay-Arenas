@@ -53,6 +53,48 @@ type BookingCancelledEvent struct {
 }
 
 type ResponsVenueServ struct {
-	ID      uint `json:"id"`
-	OwnerID uint `json:"owner_id"`
+	ID        uint      `json:"id"`
+	OwnerID   uint      `json:"owner_id"`
+	StartAt   time.Time `json:"start_at"`
+	EndAt     time.Time `json:"end_at"`
+	HourPrice float64   `json:"price_cents"`
+}
+
+// DayScheduleDTO - DTO для расписания одного дня недели (совместимо с venue-service)
+type DayScheduleDTO struct {
+	Enabled   bool    `json:"enabled"`
+	StartTime *string `json:"start_time,omitempty"`
+	EndTime   *string `json:"end_time,omitempty"`
+}
+
+// WeekdaysDTO - DTO для расписания всех дней недели (совместимо с venue-service)
+type WeekdaysDTO struct {
+	Monday    DayScheduleDTO `json:"monday"`
+	Tuesday   DayScheduleDTO `json:"tuesday"`
+	Wednesday DayScheduleDTO `json:"wednesday"`
+	Thursday  DayScheduleDTO `json:"thursday"`
+	Friday    DayScheduleDTO `json:"friday"`
+	Saturday  DayScheduleDTO `json:"saturday"`
+	Sunday    DayScheduleDTO `json:"sunday"`
+}
+
+// VenueScheduleResp - расписание в ответе от venue-service
+type VenueScheduleResp struct {
+	Weekdays WeekdaysDTO `json:"weekdays"`
+}
+
+// ResponsVenueServFull - расширенный ответ с расписанием (используется при получении данных от venue-service)
+type ResponsVenueServFull struct {
+	ID        uint              `json:"id"`
+	OwnerID   uint              `json:"owner_id"`
+	StartAt   time.Time         `json:"start_at"`
+	EndAt     time.Time         `json:"end_at"`
+	HourPrice float64           `json:"price_cents"`
+	Weekdays  VenueScheduleResp `json:"weekdays"`
+}
+
+// AvailableSlot - свободный временной отрезок площадки на дату
+type AvailableSlot struct {
+	StartAt time.Time `json:"start_at"`
+	EndAt   time.Time `json:"end_at"`
 }
