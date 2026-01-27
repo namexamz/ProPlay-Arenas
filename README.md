@@ -1,8 +1,11 @@
 # Play-Arenas
 
-Play-Arenas — это платформа онлайн-бронирования спортивных площадок и арен. Система позволяет владельцам площадок сдавать их в аренду, а пользователям находить и бронировать необходимую спортивную площадку.
+## О проекте
 
-Технологии проекта
+Play-Arenas — это платформа онлайн-бронирования спортивных площадок и арен.  
+Система позволяет владельцам площадок сдавать их во временное пользование, а пользователям находить и бронировать подходящие площадки по району, типу и времени.
+
+## Технологии проекта
 
 ![Go](https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white)
 ![Gin](https://img.shields.io/badge/Gin-008ECF?style=for-the-badge&logo=go&logoColor=white)
@@ -16,35 +19,56 @@ Play-Arenas — это платформа онлайн-бронирования 
 ![API Gateway](https://img.shields.io/badge/API_Gateway-0F172A?style=for-the-badge)
 ![Microservices](https://img.shields.io/badge/Microservices-2563EB?style=for-the-badge)
 
-Установка зависимостей
+## Установка и запуск
+
+### Установка зависимостей
+
+В каждом сервисе:
+
+```bash
 go mod download
+```
 
-Запуск проекта
+### Запуск всего проекта через Docker
+
+```bash
 docker-compose up --build
+```
 
-Запуск приложения
-# Обычный запуск
-docker-compose up --build
+Запуск в фоновом режиме:
 
-# Запуск в фоновом режиме
+```bash
 docker-compose up -d --build
+```
 
-# Запуск только Gateway локально
+### Локальный запуск Gateway
+
+```bash
 go run ./gateway/cmd/app/main.go
+```
 
-Заполнение базы данных тестовыми данными
+## Сидирование данных
+
+Заполнение базы данных тестовыми площадками:
+
+```bash
 go run ./venue-service/cmd/seed/main.go
+```
 
-Доступные команды
+## Доступные Make-команды (пример для reservation-service)
+
+```bash
 make run      # Запуск reservation-service (из каталога reservation-service)
 make dev      # Локальный запуск с hot-reload (при наличии конфигурации air)
-make lint     # Проверка кода линтером (reservation-service)
-make fmt      # Форматирование кода (reservation-service)
-make vet      # Статический анализ кода (через go vet, при необходимости)
+make lint     # Проверка кода линтером
+make fmt      # Форматирование кода
+make vet      # Статический анализ кода
 make test     # Запуск тестов (если добавлены)
+```
 
-Команда проекта
-- [tsuruevimran17](https://github.com/tsuruevimran17)
-- [Idigov](https://github.com/Idigov) (Baisangur)
-- [namexamz](https://github.com/namexamz) (Хамзат)
-- [DjMariarty](https://github.com/DjMariarty)
+## Команда проекта
+
+[![tsuruevimran17](https://img.shields.io/badge/tsuruevimran17-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/tsuruevimran17)
+[![Idigov](https://img.shields.io/badge/Idigov_(Baisangur)-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Idigov)
+[![namexamz](https://img.shields.io/badge/namexamz_(Хамзат)-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/namexamz)
+[![DjMariarty](https://img.shields.io/badge/DjMariarty-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/DjMariarty)
